@@ -116,6 +116,24 @@ the scrim or a link, because a fixed rail would eat a phone screen; above it, it
 part of the layout. The header carries the current panel's name, the theme toggle and the
 global refresh.
 
+### Ticket → merge request
+
+Every ticket number on a task-shaped panel carries a clickable `!706` chip pointing at the
+merge request that mentions it. Nothing extra is fetched: the skills behind `releases`,
+`dashboard`, `review-queue` and `pr-request` each already match an MR to a ticket by the key
+in its title or branch (`redge_work.gitlab.jira_key_of`), so `workhub/links.py` only gathers
+those answers from the stored payloads into one `key → MRs` lookup.
+
+`priority` and `testing` gain the column outright — their own skills never report an MR.
+`dashboard` keeps the MRs its payload lists and picks up anyone else's on the same ticket.
+The chip is amber when threads are unresolved, green at two approvals, and its tooltip
+carries the repo, the MR title and the counts.
+
+**What it cannot show:** merge requests that are already merged. The lookup only sees what
+those four panels hold, which is the open MRs across the configured groups, plus whatever a drift
+row still names. A ticket in Internal testing will usually show no MR for that reason —
+covering merged history would mean a new GitLab query rather than a join over what is here.
+
 The theme follows the system and can be pinned to light or dark from the header; the choice
 is stored per browser and applied before first paint so a dark page never flashes white.
 

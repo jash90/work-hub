@@ -1,7 +1,9 @@
 """Panels answering „co mam do zrobienia": dashboard, priority, testing."""
 from redge_work.polish import days_ago_phrase, plural
 
-from .layout import (BUCKET_LABELS, BUCKET_TONES, chip, empty, esc, link, section, table, when)
+from ..links import merge
+from .layout import (BUCKET_LABELS, BUCKET_TONES, chip, empty, esc, link, mr_links, section,
+                     table, when)
 
 REVIEW_LABELS = {
     "waiting_for_me": "czeka na moją odpowiedź",
@@ -13,20 +15,19 @@ REVIEW_LABELS = {
 }
 
 
-def _mr_links(mrs):
-    return " ".join(link(m.get("web_url"), "!%s" % m.get("iid"), mono=True) for m in mrs or [])
-
-
-def _task_rows(rows):
+def _task_rows(rows, index=None):
+    """`index` fills in the MR for panels whose own skill never reports one."""
+    index = index or {}
     out = []
 
     for row in rows:
+        mrs = merge(row.get("mrs"), index.get(row["key"]))
         out.append([
             link("https://jira.example.com/browse/%s" % row["key"], row["key"], mono=True),
             chip(row.get("status") or "—"),
             when(row),
             '<span class="summary">%s</span>' % esc(row.get("summary")),
-            _mr_links(row.get("mrs")),
+            mr_links(mrs),
         ])
 
     return out
@@ -74,13 +75,13 @@ def _review_rows(threads):
     return out
 
 
-def dashboard_body(payload):
+def dashboard_body(payload, index=None):
     data = payload["main"]
     blocks = []
 
     tasks = data.get("tasks") or []
     blocks.append(section(
-        "Do zrobienia", table(["Ticket", "Status", "Wydanie", "Temat", "MR"], _task_rows(tasks))
+        "Do zrobienia", table(["Ticket", "Status", "Wydanie", "Temat", "MR"], _task_rows(tasks, index))
         or empty("Nic nie czeka na start."),
         chip(str(len(tasks)))))
 
@@ -145,7 +146,7 @@ def dashboard_headline(payload):
     ])
 
 
-def priority_body(payload):
+def priority_body(payload, index=None):
     data = payload["main"]
     issues = data.get("issues") or []
     blocks = []
@@ -154,7 +155,7 @@ def priority_body(payload):
         rows = [i for i in issues if i.get("bucket", 3) == bucket]
         blocks.append(section(
             BUCKET_LABELS.get(bucket, "Inne"),
-            table(["Ticket", "Status", "Wydanie", "Temat", ""], _task_rows(rows)),
+            table(["Ticket", "Status", "Wydanie", "Temat", "MR"], _task_rows(rows, index)),
             chip(str(len(rows)), BUCKET_TONES.get(bucket, ""))))
 
     return "".join(blocks) or empty("Brak nierozwiązanych tasków.")
@@ -175,8 +176,9 @@ def _queried_status(payload):
     return rest.partition('"')[0] or "Internal testing"
 
 
-def testing_body(payload):
+def testing_body(payload, index=None):
     data = payload["main"]
+    index = index or {}
     status = _queried_status(payload)
     issues = data.get("issues") or []
     still = [i for i in issues if i.get("status") == status]
@@ -186,12 +188,15 @@ def testing_body(payload):
         return [[link("https://jira.example.com/browse/%s" % i["key"], i["key"], mono=True),
                  chip(i.get("status") or "—", "ok" if i.get("resolution") else ""),
                  '<span class="repo">%s</span>' % esc(i.get("assignee") or "—"),
-                 '<span class="summary">%s</span>' % esc(i.get("summary"))] for i in items]
+                 '<span class="summary">%s</span>' % esc(i.get("summary")),
+                 mr_links(index.get(i["key"]))] for i in items]
+
+    headers = ["Ticket", "Status", "Przypisany", "Temat", "MR"]
 
     return "".join([
-        section("Nadal w „%s”" % status, table(["Ticket", "Status", "Przypisany", "Temat"], rows(still))
+        section("Nadal w „%s”" % status, table(headers, rows(still))
                 or empty("Nic nie czeka."), chip(str(len(still)), "wait" if still else "")),
-        section("Poszły dalej", table(["Ticket", "Status", "Przypisany", "Temat"], rows(moved[:40]))
+        section("Poszły dalej", table(headers, rows(moved[:40]))
                 or empty("Nic."), chip(str(len(moved)), "ok")),
     ])
 

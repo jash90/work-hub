@@ -232,6 +232,29 @@ def when(row):
     return " ".join(parts)
 
 
+def mr_links(mrs):
+    """`!706` chips, each a link to the merge request carrying that ticket's key."""
+    out = []
+
+    for mr in mrs or []:
+        tone = ""
+        detail = []
+
+        if mr.get("approvals") is not None:
+            detail.append("%d approve" % mr["approvals"])
+            tone = "ok" if mr["approvals"] >= 2 else ""
+
+        if mr.get("unresolved"):
+            detail.append("%d nierozwiązane" % mr["unresolved"])
+            tone = "wait"
+
+        hint = " · ".join([x for x in (mr.get("repo"), mr.get("title")) if x] + detail)
+        out.append('<a class="mr-link" href="%s" target="_blank" rel="noopener" title="%s">%s</a>'
+                   % (esc(mr.get("url")), esc(hint), chip("!%s" % mr.get("iid"), tone)))
+
+    return " ".join(out)
+
+
 def notes(payload):
     """Fallback notes recorded by the runner — partial data must announce itself."""
     recorded = (payload or {}).get("_notes") or {}

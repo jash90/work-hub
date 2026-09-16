@@ -2,7 +2,7 @@
 
 RENDERERS is the whole dispatch table — one entry per panel in sources.PANELS.
 """
-from .. import sources, store
+from .. import links, sources, store
 from . import gitlab, layout, releases, reports, tempo, work
 
 RENDERERS = {
@@ -18,10 +18,15 @@ RENDERERS = {
 }
 
 
-def _safe(fn, payload):
+# Task-shaped panels whose own skill reports no merge request; they get the shared
+# key → MR lookup so every ticket number on screen can be clicked through to its MR.
+NEEDS_MR_INDEX = frozenset(("dashboard", "priority", "testing"))
+
+
+def _safe(fn, payload, index=None):
     """A renderer must never take the whole page down over one odd payload."""
     try:
-        return fn(payload)
+        return fn(payload, index) if index is not None else fn(payload)
     except Exception as exc:
         return '<div class="banner bad">Nie udało się wyrenderować panelu: %s</div>' % layout.esc(exc)
 
@@ -41,7 +46,9 @@ def body(panel_id, envelope):
     if payload is None:
         return layout.empty("Panel nie ma jeszcze danych — kliknij „Odśwież”.")
 
-    return layout.notes(payload) + _safe(RENDERERS[panel_id][0], payload)
+    index = links.build() if panel_id in NEEDS_MR_INDEX else None
+
+    return layout.notes(payload) + _safe(RENDERERS[panel_id][0], payload, index)
 
 
 def fragment(panel_id):

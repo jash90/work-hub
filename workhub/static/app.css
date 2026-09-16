@@ -437,6 +437,12 @@ code, .mono, .key { font-family: var(--mono); font-size: 12.5px; }
 
 /* Repo slugs, handles and dates are identifiers — wrapping them mid-word reads as damage. */
 .repo { color: hsl(var(--muted-foreground)); white-space: nowrap; }
+
+/* A merge-request chip is the whole link; the underline would fight the pill. */
+.mr-link { text-decoration: none; }
+.mr-link:hover { text-decoration: none; }
+.mr-link:hover .chip { border-color: hsl(var(--ring)); }
+.mr-link + .mr-link { margin-left: 4px; }
 .muted { color: hsl(var(--muted-foreground)); }
 
 section.block { margin-bottom: 30px; }
