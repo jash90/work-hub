@@ -1,14 +1,51 @@
-// Refresh buttons, clipboard briefs and the two Tempo write actions.
-// Everything POSTs with the start-up CSRF token the page carries in <html data-csrf>.
+// Refresh buttons, theme, clipboard briefs and the Tempo day editor.
+// Every POST carries the start-up CSRF token the page holds in <html data-csrf>.
 const CSRF = document.documentElement.dataset.csrf;
 
-function toast(text, ms = 3200) {
+/* ---------- theme ---------- */
+
+const THEMES = ['auto', 'light', 'dark'];
+const THEME_GLYPH = { auto: '◐', light: '☀', dark: '☾' };
+const THEME_TITLE = { auto: 'Motyw: automatyczny', light: 'Motyw: jasny', dark: 'Motyw: ciemny' };
+
+function readTheme() {
+  try {
+    return localStorage.getItem('work-hub-theme') || 'auto';
+  } catch (e) {
+    return 'auto';
+  }
+}
+
+function applyTheme(theme) {
+  if (theme === 'auto') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+
+  try {
+    localStorage.setItem('work-hub-theme', theme);
+  } catch (e) { /* private window — the theme just won't stick */ }
+
+  for (const button of document.querySelectorAll('[data-theme-toggle]')) {
+    button.textContent = THEME_GLYPH[theme];
+    button.title = THEME_TITLE[theme];
+  }
+}
+
+/* ---------- toasts ---------- */
+
+function toast(text, tone = '', ms = 4000) {
+  const stack = document.querySelector('.toast-stack');
+
+  if (!stack) return;
+
   const node = document.createElement('div');
   node.className = 'toast';
+  if (tone) node.dataset.tone = tone;
   node.textContent = text;
-  document.body.appendChild(node);
+  stack.appendChild(node);
   setTimeout(() => node.remove(), ms);
 }
+
+/* ---------- transport ---------- */
 
 async function post(path, body) {
   const response = await fetch(path, {
@@ -20,25 +57,16 @@ async function post(path, body) {
   return { status: response.status, data: await response.json().catch(() => ({})) };
 }
 
-async function state() {
-  const response = await fetch('/api/state');
+const state = async () => (await fetch('/api/state')).json();
 
-  return response.json();
-}
+/* ---------- refreshing ---------- */
 
-// Poll until the named panels stop running, then bring their markup up to date.
-async function follow(ids) {
-  const pending = new Set(ids);
-
-  while (pending.size) {
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    const now = await state();
-
-    for (const panel of now.panels) {
-      if (!pending.has(panel.id) || panel.running) continue;
-
-      pending.delete(panel.id);
-      await repaint(panel);
+function busy(ids, on) {
+  for (const id of ids) {
+    for (const button of document.querySelectorAll(`[data-refresh="${id}"]`)) {
+      button.disabled = on;
+      button.setAttribute('aria-busy', String(on));
+      button.textContent = on ? 'Odświeżam' : 'Odśwież';
     }
   }
 }
@@ -48,36 +76,60 @@ async function repaint(panel) {
 
   if (host) {
     host.innerHTML = await (await fetch(`/p/${panel.id}/fragment`)).text();
-    bindCopy(host);
-    bindTempo(host);
+    bind(host);
   }
-
-  if (document.querySelector('.grid')) window.location.reload();
 }
 
-function markRunning(ids) {
-  for (const id of ids) {
-    for (const button of document.querySelectorAll(`[data-refresh="${id}"]`)) {
-      button.disabled = true;
-      button.textContent = 'Odświeżam…';
+// Poll until the named panels stop running, then bring their markup up to date.
+async function follow(ids) {
+  const pending = new Set(ids);
+  let refreshedCards = false;
+
+  while (pending.size) {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    const now = await state();
+
+    for (const panel of now.panels) {
+      if (!pending.has(panel.id) || panel.running) continue;
+
+      pending.delete(panel.id);
+      busy([panel.id], false);
+      await repaint(panel);
+
+      if (panel.error && panel.fetched_at) toast(`${panel.label}: dane starsze, odświeżenie nie przeszło`, 'bad', 7000);
+      else if (panel.error) toast(`${panel.label}: ${panel.error.slice(0, 160)}`, 'bad', 8000);
+
+      if (document.querySelector('.grid')) refreshedCards = true;
     }
   }
+
+  if (refreshedCards) window.location.reload();
 }
 
 document.addEventListener('click', async (event) => {
+  const theme = event.target.closest('[data-theme-toggle]');
+
+  if (theme) {
+    applyTheme(THEMES[(THEMES.indexOf(readTheme()) + 1) % THEMES.length]);
+
+    return;
+  }
+
   const one = event.target.closest('[data-refresh]');
   const all = event.target.closest('[data-refresh-all]');
 
   if (!one && !all) return;
 
-  const body = all ? { all: true } : { panel: one.dataset.refresh };
-  const { data } = await post('/api/refresh', body);
+  const { data } = await post('/api/refresh', all ? { all: true } : { panel: one.dataset.refresh });
   const ids = data.started || [];
 
-  markRunning(ids);
+  busy(ids, true);
+  if (all) event.target.closest('[data-refresh-all]').setAttribute('aria-busy', 'true');
   toast(all ? 'Odświeżam wszystkie panele…' : 'Odświeżam…');
   await follow(ids);
 });
+
+/* ---------- clipboard ---------- */
 
 function bindCopy(root) {
   for (const button of root.querySelectorAll('[data-copy]')) {
@@ -85,41 +137,219 @@ function bindCopy(root) {
       const text = new TextDecoder().decode(
         Uint8Array.from(atob(button.dataset.copy), (c) => c.charCodeAt(0)),
       );
-      await navigator.clipboard.writeText(text);
-      toast('Skopiowane do schowka');
+
+      try {
+        await navigator.clipboard.writeText(text);
+        toast('Skopiowane do schowka', 'ok');
+      } catch (e) {
+        toast('Przeglądarka nie dała dostępu do schowka', 'bad');
+      }
     };
   }
+}
+
+/* ---------- tempo day editor ---------- */
+
+// QUARTER, round15, fmt, parseHours and dayVerdict come from day-rules.js.
+const readHours = (input) => parseHours(input.value);
+
+function dayEntries(day) {
+  return [...day.querySelectorAll('[data-entry]')].map((row) => ({
+    row,
+    key: row.querySelector('.entry-key a, .entry-key').textContent.trim(),
+    hours: readHours(row.querySelector('.hours')),
+  }));
+}
+
+function refreshDay(day) {
+  const all = dayEntries(day);
+  const target = Number(day.dataset.target);
+  const partial = day.querySelector('[data-partial]').checked;
+  const verdict = dayVerdict(all.map((e) => e.hours), target, partial);
+
+  for (const entry of all) {
+    entry.row.querySelector('.hours').setAttribute('aria-invalid', String(Number.isNaN(entry.hours)));
+  }
+
+  const badge = day.querySelector('[data-total]');
+  badge.textContent = `${fmt(verdict.total)} h`;
+  badge.className = `chip ${verdict.total === target ? 'ok' : 'wait'}`;
+
+  const hint = day.querySelector('[data-hint]');
+  hint.textContent = verdict.note;
+  hint.dataset.tone = verdict.ok ? 'ok' : 'bad';
+
+  day.dataset.valid = verdict.ok ? 'yes' : 'no';
+  const submit = day.querySelector('[data-tempo-log]');
+  submit.disabled = !verdict.ok;
+  submit.title = verdict.problem || 'Zapisze worklogi w Tempo';
+
+  return { entries: all.filter((e) => e.hours > 0), total: verdict.total, partial };
+}
+
+function entriesString(entries) {
+  return entries.map((e) => `${e.key}=${fmt(e.hours)}`).join(',');
+}
+
+function addEntryRow(day, key, hours) {
+  const body = day.querySelector('.entries-table tbody');
+  const row = document.createElement('tr');
+  row.className = 'entry';
+  row.dataset.entry = '';
+  row.innerHTML = `
+    <td class="entry-key"><a class="key" href="https://jira.example.com/browse/${key}" target="_blank" rel="noopener">${key}</a></td>
+    <td class="entry-summary"><span class="muted">dodane ręcznie</span></td>
+    <td class="entry-commits"></td>
+    <td class="entry-hours">
+      <div class="stepper">
+        <button type="button" class="step" data-step="-0.25" aria-label="mniej o 15 minut">−</button>
+        <input type="text" class="hours" value="${fmt(hours)}" inputmode="decimal" autocomplete="off">
+        <button type="button" class="step" data-step="0.25" aria-label="więcej o 15 minut">+</button>
+      </div>
+    </td>
+    <td class="entry-drop"><button type="button" class="ghost" data-drop aria-label="usuń pozycję">×</button></td>`;
+  body.appendChild(row);
 }
 
 function bindTempo(root) {
-  for (const button of root.querySelectorAll('[data-tempo-log]')) {
-    button.onclick = async () => {
-      const day = button.dataset.tempoLog;
-      const field = root.querySelector(`[data-entries="${day}"]`);
-      const entries = field ? field.value.trim() : '';
+  for (const day of root.querySelectorAll('.day')) {
+    const update = () => refreshDay(day);
 
-      if (!confirm(`Zapisać worklogi w Jirze za ${day}?\n\n${entries}\n\nTo jest realny POST do Tempo.`)) return;
+    day.addEventListener('input', (event) => {
+      if (event.target.classList.contains('hours')) update();
+    });
 
-      button.disabled = true;
-      const { data } = await post('/api/tempo/log', { day, entries, confirm: true });
-      button.disabled = false;
-      toast(data.ok ? `Zalogowano ${day}` : `Odmowa: ${(data.output || data.error || '').slice(0, 180)}`, 7000);
-    };
-  }
+    day.addEventListener('change', (event) => {
+      if (event.target.matches('[data-partial]')) update();
 
-  for (const button of root.querySelectorAll('[data-tempo-undo]')) {
-    button.onclick = async () => {
-      const day = button.dataset.tempoUndo;
+      if (event.target.classList.contains('hours')) {
+        const hours = readHours(event.target);
 
-      if (!confirm(`Cofnąć worklogi za ${day}? Skasuje je z Jiry.`)) return;
+        if (!Number.isNaN(hours)) event.target.value = fmt(round15(hours));
 
-      button.disabled = true;
-      const { data } = await post('/api/tempo/undo', { day, confirm: true });
-      button.disabled = false;
-      toast(data.ok ? `Cofnięto ${day}` : `Nie udało się: ${(data.output || '').slice(0, 180)}`, 7000);
-    };
+        update();
+      }
+    });
+
+    // Text fields lose the native spinner, so keep arrow keys stepping by 15 minutes.
+    day.addEventListener('keydown', (event) => {
+      if (!event.target.classList.contains('hours')) return;
+
+      const direction = { ArrowUp: 1, ArrowDown: -1 }[event.key];
+
+      if (!direction) return;
+
+      event.preventDefault();
+      const hours = readHours(event.target);
+      event.target.value = fmt(round15((Number.isNaN(hours) ? 0 : hours) + direction * QUARTER));
+      update();
+    });
+
+    day.addEventListener('click', async (event) => {
+      const step = event.target.closest('.step');
+      const drop = event.target.closest('[data-drop]');
+      const add = event.target.closest('[data-add]');
+
+      if (step) {
+        const input = step.parentElement.querySelector('.hours');
+        const hours = readHours(input);
+        input.value = fmt(round15((Number.isNaN(hours) ? 0 : hours) + Number(step.dataset.step)));
+        update();
+
+        return;
+      }
+
+      if (drop) {
+        drop.closest('tr').remove();
+        update();
+
+        return;
+      }
+
+      if (add) {
+        const keyField = day.querySelector('.add-key');
+        const key = keyField.value.trim().toUpperCase();
+
+        if (!/^[A-Z][A-Z0-9]*-\d+$/.test(key)) {
+          keyField.setAttribute('aria-invalid', 'true');
+          toast('Klucz ticketu wygląda jak ABC-1234', 'bad');
+
+          return;
+        }
+
+        keyField.removeAttribute('aria-invalid');
+        const addHours = readHours(day.querySelector('.add-hours'));
+        addEntryRow(day, key, round15(Number.isNaN(addHours) || !addHours ? QUARTER : addHours));
+        keyField.value = '';
+        update();
+
+        return;
+      }
+
+      const log = event.target.closest('[data-tempo-log]');
+      const undo = event.target.closest('[data-tempo-undo]');
+
+      if (log) await submitDay(day, log);
+      if (undo) await undoDay(day, undo);
+    });
+
+    update();
   }
 }
 
-bindCopy(document);
-bindTempo(document);
+async function submitDay(day, button) {
+  const { entries, total, partial } = refreshDay(day);
+
+  if (day.dataset.valid !== 'yes') return;
+
+  const listing = entries.map((e) => `  ${e.key} — ${fmt(e.hours)} h`).join('\n');
+  const label = partial && total !== Number(day.dataset.target) ? ' (niepełny dzień)' : '';
+
+  if (!confirm(`Zapisać worklogi w Tempo za ${day.dataset.day}${label}?\n\n${listing}\n\nRazem ${fmt(total)} h. To jest realny POST do Jiry.`)) return;
+
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+
+  const { data } = await post('/api/tempo/log', {
+    day: day.dataset.day,
+    entries: entriesString(entries),
+    allow_partial: partial,
+    confirm: true,
+  });
+
+  button.removeAttribute('aria-busy');
+  button.disabled = false;
+  toast(data.ok ? `Zalogowano ${day.dataset.day} — ${fmt(total)} h` : `Odmowa: ${(data.output || data.error || '').slice(0, 200)}`,
+        data.ok ? 'ok' : 'bad', data.ok ? 4000 : 9000);
+}
+
+async function undoDay(day, button) {
+  if (!confirm(`Cofnąć worklogi za ${day.dataset.day}? Skasuje je z Jiry.`)) return;
+
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+
+  const { data } = await post('/api/tempo/undo', { day: day.dataset.day, confirm: true });
+
+  button.removeAttribute('aria-busy');
+  button.disabled = false;
+  toast(data.ok ? `Cofnięto ${day.dataset.day}` : `Nie udało się: ${(data.output || '').slice(0, 200)}`,
+        data.ok ? 'ok' : 'bad', data.ok ? 4000 : 9000);
+}
+
+function bind(root) {
+  bindCopy(root);
+  bindTempo(root);
+}
+
+function markOverflow() {
+  const tabs = document.querySelector('.tabs');
+
+  if (tabs) tabs.classList.toggle('overflowing', tabs.scrollWidth > tabs.clientWidth + 1);
+}
+
+window.addEventListener('resize', markOverflow);
+
+applyTheme(readTheme());
+bind(document);
+markOverflow();

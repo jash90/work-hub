@@ -200,7 +200,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "zły format dnia (YYYY-MM-DD)"})
 
         if write:
-            result = tempo.log_day(day, (body.get("entries") or "").strip())
+            result = tempo.log_day(day, (body.get("entries") or "").strip(),
+                               allow_partial=body.get("allow_partial") is True)
         else:
             result = tempo.undo_day(day)
 

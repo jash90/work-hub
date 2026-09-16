@@ -17,7 +17,9 @@ from .runner import PATH, _env
 SCRIPT = sources.skill("tempo-fill", "tempo.py")
 WRITE_LOG = os.path.join(DATA_DIR, "write-log.jsonl")
 DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-ENTRIES = re.compile(r"^[A-Z][A-Z0-9]*-\d+=\d+(?:[.,]\d+)?(?:,[A-Z][A-Z0-9]*-\d+=\d+(?:[.,]\d+)?)*$")
+# The skill parses hours with float(), so a decimal comma would crash it — only a dot passes.
+ENTRY = r"[A-Z][A-Z0-9]*-\d+=\d+(?:\.\d+)?"
+ENTRIES = re.compile(r"^%s(?:,%s)*$" % (ENTRY, ENTRY))
 TIMEOUT = 120
 
 
@@ -47,17 +49,34 @@ def _run(action, day, argv):
     return result
 
 
-def log_day(day, entries):
-    """POST one day's worklogs. `entries` is the skill's own "KEY=h,KEY=h" notation."""
-    if entries and not ENTRIES.match(entries.replace(" ", "")):
-        return {"ok": False, "output": "zły format wpisów — oczekiwane KEY=h,KEY=h", "exit_code": None}
-
-    argv = ["/usr/bin/python3", SCRIPT, "log", day, "--yes"]
+def log_argv(day, entries, allow_partial=False):
+    """The exact command a write would run — built apart from running it, so it is testable."""
+    argv = ["/usr/bin/python3", SCRIPT, "log", day]
 
     if entries:
-        argv[4:4] = ["--entries", entries.replace(" ", "")]
+        argv += ["--entries", entries]
 
-    return _run("log", day, argv)
+    argv.append("--yes")
+
+    if allow_partial:
+        argv.append("--allow-partial")
+
+    return argv
+
+
+def log_day(day, entries, allow_partial=False):
+    """POST one day's worklogs. `entries` is the skill's own "KEY=h,KEY=h" notation.
+
+    Only the shape is checked here; whether the split is legal (15-minute grid, 8 h total,
+    a workday that is not already logged) stays the skill's call.
+    """
+    entries = (entries or "").replace(" ", "")
+
+    if entries and not ENTRIES.match(entries):
+        return {"ok": False, "output": "zły format wpisów — oczekiwane KEY=h,KEY=h (godziny z kropką)",
+                "exit_code": None}
+
+    return _run("log", day, log_argv(day, entries, allow_partial))
 
 
 def undo_day(day):

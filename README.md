@@ -51,6 +51,23 @@ explicit `confirm: true` in the body. **No automatic job ever posts** — the 16
 computes proposals. Every attempt is appended to `data/write-log.jsonl`, and every guard
 (weekend, holiday, day already logged, total ≠ 8 h) stays in the skill.
 
+### The Tempo day editor
+
+Each proposed day is editable before it is written. Hours move on the skill's own 15-minute
+grid — `−`/`+` buttons, arrow keys, or typing — and the running total, the hint line and the
+submit button update together. The day cannot be submitted until it is actually writable, so
+a bad split is caught in the browser instead of coming back as the skill's `sys.exit`.
+
+- entries can be removed, and a ticket can be added by key for work with no commit behind it;
+- **niepełny dzień** is an explicit opt-in that passes `--allow-partial` for a day that is not 8 h;
+- hour fields are text, not `type=number`: Chrome renders a number input in the page locale, so
+  a Polish decimal comma typed by hand would read back as an empty value. `parseHours` accepts
+  `1,75` and `1.75` alike, and flags anything else instead of silently treating it as zero;
+- the decimal comma is rejected again server-side — the skill parses hours with `float()`.
+
+Those rules live in `workhub/static/day-rules.js`, deliberately free of the DOM, and are
+tested by running them under Node (`tests/test_day_rules.py`).
+
 ## Two panels need Claude
 
 `commits` and `protokol` show what their scripts produce on their own and offer a
@@ -82,12 +99,27 @@ Single-user, loopback only, and it has a write path — so:
 
 `http.server` is not a public web server and is not used as one.
 
+## Look and feel
+
+The visual layer is two files: **`workhub/static/app.css`** (tokens and components) and
+**`workhub/render/layout.py`** (page shell, nav, badges, banners, tables).
+
+The stylesheet is a port of the shadcn/ui design language into plain CSS — the same tokens
+(`--background`, `--foreground`, `--card`, `--primary`, `--muted`, `--border`, `--ring`,
+`--radius`) expressed as HSL triplets, the same component anatomy (button variants, card,
+badge, alert, table, input, tabs) and the same focus-visible ring. No React, no Tailwind, no
+build step, so the hub keeps its zero-dependency start-up.
+
+The theme follows the system and can be pinned to light or dark from the header; the choice
+is stored per browser and applied before first paint so a dark page never flashes white.
+
 ## Tests
 
     /usr/bin/python3 -m unittest discover -s . -t . -p "test_*.py"
 
 No network: the scheduler runs on an injected clock, the server tests bind an ephemeral
-port, renderers run against inline payloads.
+port, renderers run against inline payloads, and the Tempo write tests build the command
+without ever running it. The day-rule tests shell out to Node and skip when it is absent.
 
 ## Dependencies
 

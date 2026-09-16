@@ -54,7 +54,7 @@ def fragment(panel_id):
 def _card(panel):
     envelope = store.read(panel.id)
 
-    return """<article class="card" data-panel="%s">
+    return """<article class="card" data-panel="%s" data-state="%s">
   <h2><a href="/p/%s">%s</a></h2>
   <p class="blurb">%s</p>
   <p class="headline">%s</p>
@@ -63,8 +63,9 @@ def _card(panel):
     <span class="spacer"></span>
     <button data-refresh="%s">Odśwież</button>
   </footer>
-</article>""" % (panel.id, panel.id, layout.esc(panel.label), layout.esc(panel.blurb),
-                 headline(panel.id, envelope), layout.freshness(envelope), panel.id)
+</article>""" % (panel.id, layout.state_of(envelope), panel.id, layout.esc(panel.label),
+                 layout.esc(panel.blurb), headline(panel.id, envelope),
+                 layout.freshness(envelope), panel.id)
 
 
 def _overview_groups():
@@ -89,25 +90,27 @@ def overview(hub):
 
     schedule = " · ".join("%s: %s" % (s["label"], s["last_run"] or "jeszcze nie")
                           for s in hub.scheduler.describe())
-    note = '<p class="headline">Ostatnie automatyczne przebiegi — %s</p>' % layout.esc(schedule)
+    head = ('<div class="page-head"><h1>Przegląd</h1>'
+            '<p>Ostatnie automatyczne przebiegi — %s</p></div>') % layout.esc(schedule)
 
-    return layout.page("work-hub", "", note + "".join(groups), hub.csrf)
+    return layout.page("work-hub", "", head + "".join(groups), hub.csrf)
 
 
 def panel_page(hub, panel_id):
     panel = sources.BY_ID[panel_id]
     envelope = store.read(panel_id)
 
-    head = """<section class="panel" data-panel="%s">
-  <header class="top" style="border:none;padding:0;margin-bottom:12px">
-    <h1 style="font-size:17px">%s</h1>
-    <span class="chip">%s</span>
+    head = """<section class="panel" data-panel="%s" data-state="%s">
+  <header class="panel-head">
+    <h1>%s</h1>
+    %s
     <span class="spacer"></span>
     %s
     <button data-refresh="%s">Odśwież</button>
   </header>
   <div data-fragment>%s</div>
-</section>""" % (panel_id, layout.esc(panel.label), headline(panel_id, envelope),
-                 layout.freshness(envelope), panel_id, fragment(panel_id))
+</section>""" % (panel_id, layout.state_of(envelope), layout.esc(panel.label),
+                 headline(panel_id, envelope), layout.freshness(envelope),
+                 panel_id, fragment(panel_id))
 
     return layout.page("%s — work-hub" % panel.label, panel_id, head, hub.csrf)

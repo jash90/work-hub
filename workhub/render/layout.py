@@ -1,6 +1,7 @@
 """The page shell and the small vocabulary of bits every panel reuses."""
 import datetime
 import html
+import re
 import time
 
 from redge_work.polish import days_phrase, plural
@@ -75,10 +76,22 @@ def banner(envelope):
         return ""
 
     if envelope.get("payload") is None:
-        return '<div class="banner bad"><strong>Nie udało się pobrać danych.</strong> %s</div>' % esc(error)
+        return ('<div class="banner bad"><strong>Nie udało się pobrać danych.</strong> %s</div>'
+                % esc(tidy_error(error)))
 
     return ('<div class="banner warn"><strong>Dane z %s</strong> — ostatnia próba (%s) nie powiodła się: %s</div>'
-            % (esc(clock(envelope.get("fetched_at"))), esc(clock(envelope.get("attempted_at"))), esc(error)))
+            % (esc(clock(envelope.get("fetched_at"))), esc(clock(envelope.get("attempted_at"))),
+               esc(tidy_error(error))))
+
+
+TAGS = re.compile(r"<[^>]+>")
+
+
+def tidy_error(text, limit=220):
+    """Skills relay whatever the server said — sometimes a whole HTML error page."""
+    plain = " ".join(TAGS.sub(" ", text or "").split())
+
+    return plain[:limit] + ("…" if len(plain) > limit else "")
 
 
 def empty(text):
@@ -91,14 +104,27 @@ def section(title, body, note=""):
     return '<section class="block">%s%s</section>' % (head, body)
 
 
+def state_of(envelope):
+    """What a card should look like: fresh, showing older data, failed outright, or empty."""
+    if not envelope or envelope.get("payload") is None:
+        return "error" if (envelope or {}).get("error") else "empty"
+
+    return "stale" if envelope.get("error") else "ok"
+
+
 def nav(active):
     links = ['<a href="/" class="%s">Przegląd</a>' % ("on" if active == "" else "")]
 
     for panel in sources.PANELS:
-        links.append('<a href="/p/%s" class="%s">%s</a>' % (
-            panel.id, "on" if active == panel.id else "", esc(panel.label)))
+        links.append('<a href="/p/%s" class="%s" title="%s">%s</a>' % (
+            panel.id, "on" if active == panel.id else "", esc(panel.label), esc(panel.short)))
 
     return '<nav class="tabs">%s</nav>' % "".join(links)
+
+
+# Applied before first paint so a dark theme never flashes white on load.
+THEME_BOOT = ("<script>try{var t=localStorage.getItem('work-hub-theme');"
+              "if(t&&t!=='auto')document.documentElement.dataset.theme=t;}catch(e){}</script>")
 
 
 def page(title, active, body, csrf):
@@ -109,20 +135,26 @@ def page(title, active, body, csrf):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%s</title>
 <link rel="stylesheet" href="/static/app.css">
+%s
 </head>
 <body>
-<div class="page">
-<header class="top">
-  <h1>work-hub</h1>
-  %s
-  <span class="spacer"></span>
-  <button class="primary" data-refresh-all>Odśwież wszystko</button>
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand"><span class="dot"></span>work-hub</span>
+    %s
+    <span class="spacer"></span>
+    <button class="ghost icon" data-theme-toggle title="Motyw: automatyczny" aria-label="Zmień motyw">◐</button>
+    <button class="primary" data-refresh-all>Odśwież wszystko</button>
+  </div>
 </header>
+<div class="page">
 %s
 </div>
+<div class="toast-stack" role="status" aria-live="polite"></div>
+<script src="/static/day-rules.js"></script>
 <script src="/static/app.js"></script>
 </body>
-</html>""" % (esc(csrf), esc(title), nav(active), body)
+</html>""" % (esc(csrf), esc(title), THEME_BOOT, nav(active), body)
 
 
 BUCKET_LABELS = {0: "Po terminie", 1: "Nadchodzące", 2: "Bez daty", 3: "Bez wersji"}
