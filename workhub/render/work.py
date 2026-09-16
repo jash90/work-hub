@@ -48,7 +48,7 @@ def _mr_rows(mrs, min_approvals):
 
         out.append([
             link(mr.get("web_url"), "!%s" % mr.get("iid"), mono=True),
-            '<span class="muted">%s</span>' % esc(mr.get("repo")),
+            '<span class="repo">%s</span>' % esc(mr.get("repo")),
             '<span class="summary">%s</span>' % esc(mr.get("title")),
             " ".join(marks),
             '<span class="muted">%s</span>' % esc(", ".join(flags)) if flags else "",
@@ -65,7 +65,7 @@ def _review_rows(threads):
         waited = thread.get("waited_days")
         out.append([
             link(thread.get("url"), "!%s" % thread.get("iid"), mono=True),
-            '<span class="muted">%s</span>' % esc(thread.get("repo")),
+            '<span class="repo">%s</span>' % esc(thread.get("repo")),
             '<span class="key">%s</span>' % esc(where),
             '<span class="summary">%s</span>' % esc((thread.get("excerpt") or "")[:220]),
             '<span class="muted">%s</span>' % esc("od %s" % days_ago_phrase(waited) if waited is not None else ""),
@@ -185,7 +185,7 @@ def testing_body(payload):
     def rows(items):
         return [[link("https://jira.example.com/browse/%s" % i["key"], i["key"], mono=True),
                  chip(i.get("status") or "—", "ok" if i.get("resolution") else ""),
-                 '<span class="muted">%s</span>' % esc(i.get("assignee") or "—"),
+                 '<span class="repo">%s</span>' % esc(i.get("assignee") or "—"),
                  '<span class="summary">%s</span>' % esc(i.get("summary"))] for i in items]
 
     return "".join([

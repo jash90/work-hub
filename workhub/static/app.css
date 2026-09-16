@@ -119,7 +119,7 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 }
 
 .topbar-inner {
-  max-width: 1200px;
+  max-width: 1160px;
   margin: 0 auto;
   padding: 0 24px;
   height: 56px;
@@ -147,7 +147,7 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .spacer { flex: 1 1 auto; }
 
 .page {
-  max-width: 1200px;
+  max-width: 1160px;
   margin: 0 auto;
   padding: 28px 24px 80px;
   display: flex;
@@ -158,76 +158,55 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .page-head h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 4px; }
 .page-head p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 13.5px; }
 
-/* ---------- drawer (shadcn sheet) ---------- */
+/* ---------- sidebar ---------- */
 
-.crumb {
-  font-size: 13px;
-  color: hsl(var(--muted-foreground));
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+:root { --rail: 248px; }
 
-.crumb::before { content: "/"; margin-right: 8px; opacity: .5; }
-
-.drawer-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: hsl(240 10% 3.9% / 0.6);
-  backdrop-filter: blur(2px);
-  animation: fade-in .15s ease-out;
-}
-
-.drawer {
+.sidebar {
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
-  z-index: 51;
-  width: min(300px, 86vw);
+  z-index: 30;
+  width: var(--rail);
   display: flex;
   flex-direction: column;
-  background: hsl(var(--background));
+  background: hsl(var(--card));
   border-right: 1px solid hsl(var(--border));
-  box-shadow: 0 0 40px hsl(240 10% 3.9% / 0.25);
-  animation: slide-in .2s cubic-bezier(.32, .72, 0, 1);
 }
 
-.drawer[hidden], .drawer-overlay[hidden] { display: none; }
-
-.drawer-head {
+.sidebar-head {
   display: flex;
   align-items: center;
-  gap: 10px;
   height: 56px;
-  padding: 0 12px 0 18px;
+  padding: 0 18px;
   border-bottom: 1px solid hsl(var(--border));
+  flex: 0 0 auto;
 }
 
-.drawer-nav { padding: 12px; overflow-y: auto; }
+.sidebar-nav { padding: 12px; overflow-y: auto; flex: 1 1 auto; }
 
-.drawer-nav a {
+.sidebar-nav a {
   display: block;
-  padding: 8px 11px;
+  padding: 7px 11px;
   border-radius: calc(var(--radius) - 2px);
   font-size: 13.5px;
   font-weight: 500;
-  color: hsl(var(--foreground));
-  transition: background .12s;
+  color: hsl(var(--muted-foreground));
+  transition: background .12s, color .12s;
 }
 
-.drawer-nav a:hover { background: hsl(var(--accent)); text-decoration: none; }
+.sidebar-nav a:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); text-decoration: none; }
 
-.drawer-nav a.on {
+.sidebar-nav a.on {
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
 }
 
-.drawer-group { margin-top: 14px; }
-.drawer-group:first-of-type { margin-top: 10px; }
+.nav-group { margin-top: 16px; }
+.nav-group:first-of-type { margin-top: 12px; }
 
-.drawer-group h4 {
+.nav-group h4 {
   margin: 0 0 4px;
   padding: 0 11px;
   font-size: 11px;
@@ -237,8 +216,47 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   color: hsl(var(--muted-foreground));
 }
 
+.content { margin-left: var(--rail); min-width: 0; }
+
+.crumb {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The rail is permanent; only the narrow layout hides it behind the header button. */
+.nav-toggle { display: none; }
+.scrim { display: none; }
+
+@media (max-width: 860px) {
+  .sidebar {
+    z-index: 51;
+    transform: translateX(-100%);
+    transition: transform .2s cubic-bezier(.32, .72, 0, 1);
+    box-shadow: 0 0 40px hsl(240 10% 3.9% / 0.25);
+  }
+
+  .sidebar.open { transform: none; }
+  .content { margin-left: 0; }
+  .nav-toggle { display: inline-flex; }
+
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: hsl(240 10% 3.9% / 0.6);
+    animation: fade-in .15s ease-out;
+  }
+
+  .scrim[hidden] { display: none; }
+}
+
 @keyframes fade-in { from { opacity: 0; } }
-@keyframes slide-in { from { transform: translateX(-100%); } }
 
 /* ---------- button ---------- */
 
@@ -416,6 +434,9 @@ code, .mono, .key { font-family: var(--mono); font-size: 12.5px; }
 .key { white-space: nowrap; font-weight: 500; }
 .key:hover { text-decoration: underline; text-underline-offset: 3px; }
 .summary { color: hsl(var(--card-foreground)); }
+
+/* Repo slugs, handles and dates are identifiers — wrapping them mid-word reads as damage. */
+.repo { color: hsl(var(--muted-foreground)); white-space: nowrap; }
 .muted { color: hsl(var(--muted-foreground)); }
 
 section.block { margin-bottom: 30px; }

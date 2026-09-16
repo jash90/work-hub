@@ -42,7 +42,7 @@ def body(payload):
             rows.append([
                 link("https://jira.example.com/browse/%s" % issue["key"], issue["key"], mono=True),
                 chip(issue.get("status") or "—", PROGRESS_TONES.get(issue.get("progress"), "")),
-                '<span class="muted">%s</span>' % esc(issue.get("assignee") or "—"),
+                '<span class="repo">%s</span>' % esc(issue.get("assignee") or "—"),
                 '<span class="summary">%s</span>' % esc(issue.get("summary")),
                 _mr_marks(mrs.get(issue["key"])),
             ])

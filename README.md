@@ -110,11 +110,11 @@ The stylesheet is a port of the shadcn/ui design language into plain CSS — the
 badge, alert, table, input, tabs) and the same focus-visible ring. No React, no Tailwind, no
 build step, so the hub keeps its zero-dependency start-up.
 
-Navigation is a slide-in drawer (shadcn's sheet) behind the header's hamburger, grouped the
-same way the overview is — poranek, po pracy, na żądanie. It opens with the current panel
-focused, closes on Escape, the overlay or a link, and locks the page behind it. Ten panels
-never fit a header tab strip, and the header now carries only the brand, the current panel's
-name, the theme toggle and the global refresh.
+Navigation is a permanent left rail, grouped the way the overview is — poranek, po pracy,
+na żądanie. Below 860px it slides away behind the header's hamburger and closes on Escape,
+the scrim or a link, because a fixed rail would eat a phone screen; above it, it is simply
+part of the layout. The header carries the current panel's name, the theme toggle and the
+global refresh.
 
 The theme follows the system and can be pinned to light or dark from the header; the choice
 is stored per browser and applied before first paint so a dark page never flashes white.

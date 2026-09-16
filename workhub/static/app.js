@@ -107,8 +107,8 @@ async function follow(ids) {
 }
 
 document.addEventListener('click', async (event) => {
-  if (event.target.closest('[data-drawer-open]')) return setDrawer(true);
-  if (event.target.closest('[data-drawer-close]')) return setDrawer(false);
+  if (event.target.closest('[data-nav-open]')) return setNav(true);
+  if (event.target.closest('[data-nav-close]')) return setNav(false);
 
   const theme = event.target.closest('[data-theme-toggle]');
 
@@ -345,26 +345,28 @@ function bind(root) {
   bindTempo(root);
 }
 
-/* ---------- drawer ---------- */
+/* ---------- sidebar (only collapsible on a narrow screen) ---------- */
 
-function setDrawer(open) {
-  const drawer = document.getElementById('drawer');
-  const overlay = document.querySelector('.drawer-overlay');
-  const trigger = document.querySelector('[data-drawer-open]');
+function setNav(open) {
+  const sidebar = document.getElementById('sidebar');
+  const scrim = document.querySelector('.scrim');
+  const toggle = document.querySelector('[data-nav-open]');
 
-  if (!drawer) return;
+  if (!sidebar) return;
 
-  drawer.hidden = !open;
-  if (overlay) overlay.hidden = !open;
-  if (trigger) trigger.setAttribute('aria-expanded', String(open));
+  sidebar.classList.toggle('open', open);
+  if (scrim) scrim.hidden = !open;
+  if (toggle) toggle.setAttribute('aria-expanded', String(open));
   document.body.style.overflow = open ? 'hidden' : '';
-
-  if (open) (drawer.querySelector('a.on') || drawer.querySelector('a'))?.focus();
-  else trigger?.focus();
 }
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') setDrawer(false);
+  if (event.key === 'Escape') setNav(false);
+});
+
+// A link tap on the narrow layout should not leave the rail covering the page it opened.
+document.addEventListener('click', (event) => {
+  if (event.target.closest('.sidebar-nav a')) setNav(false);
 });
 
 applyTheme(readTheme());

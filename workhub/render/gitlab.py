@@ -21,9 +21,9 @@ def queue_body(payload):
 
         rows.append([
             link(item.get("web_url"), "!%s" % item.get("iid"), mono=True),
-            '<span class="muted">%s</span>' % esc(item.get("project", "").split("/")[-1]),
+            '<span class="repo">%s</span>' % esc(item.get("project", "").split("/")[-1]),
             esc(item.get("version_name") or "—"),
-            '<span class="muted">%s</span>' % esc(item.get("author")),
+            '<span class="repo">%s</span>' % esc(item.get("author")),
             '<span class="summary">%s</span>' % esc(item.get("title")),
             " ".join(marks),
         ])
@@ -36,7 +36,7 @@ def queue_body(payload):
 
     if skipped:
         srows = [[link(s.get("web_url"), "!%s" % s.get("iid"), mono=True),
-                  '<span class="muted">%s</span>' % esc(s.get("project", "").split("/")[-1]),
+                  '<span class="repo">%s</span>' % esc(s.get("project", "").split("/")[-1]),
                   '<span class="summary">%s</span>' % esc(s.get("title")),
                   '<span class="muted">%s</span>' % esc(s.get("reason"))] for s in skipped]
         blocks.append(section("Pominięte", table(["MR", "Repo", "Tytuł", "Powód"], srows),
@@ -83,7 +83,7 @@ def request_body(payload):
 
         rows.append([
             link(mr.get("url"), "!%s" % mr.get("iid"), mono=True),
-            '<span class="muted">%s</span>' % esc(mr.get("project", "").split("/")[-1]),
+            '<span class="repo">%s</span>' % esc(mr.get("project", "").split("/")[-1]),
             esc(mr.get("version_name") or "—"),
             '<span class="summary">%s</span>' % esc(mr.get("title")),
             chip(mr.get("jira_status") or "—"),

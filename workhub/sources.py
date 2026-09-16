@@ -140,7 +140,7 @@ def group_panels(group):
 
 
 def grouped_panels():
-    """Each panel once, under the earliest group that refreshes it — for nav and overview."""
+    """Each panel once, under the earliest group that refreshes it — nav and overview."""
     seen = set()
 
     for group in (MORNING, AFTERNOON, ON_DEMAND):

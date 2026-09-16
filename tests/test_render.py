@@ -50,16 +50,23 @@ class Rendering(unittest.TestCase):
 
 
 class Navigation(unittest.TestCase):
-    def test_drawer_lists_every_panel_exactly_once(self):
+    def test_sidebar_lists_every_panel_exactly_once(self):
         from workhub import sources
 
-        html = layout.drawer("tempo")
+        html = layout.sidebar("tempo")
 
         for panel in sources.PANELS:
             self.assertEqual(1, html.count('href="/p/%s"' % panel.id), panel.id)
 
-    def test_drawer_marks_the_open_panel(self):
-        self.assertIn('href="/p/tempo" class="on"', layout.drawer("tempo"))
+    def test_sidebar_marks_the_open_panel(self):
+        self.assertIn('href="/p/tempo" class="on"', layout.sidebar("tempo"))
+
+    def test_sidebar_is_part_of_the_page_not_a_dialog(self):
+        """It is a permanent rail; only the narrow layout hides it, and that is CSS."""
+        html = layout.sidebar("tempo")
+
+        self.assertNotIn("aria-modal", html)
+        self.assertNotIn('<aside class="sidebar" id="sidebar" hidden', html)
 
     def test_header_names_the_open_panel(self):
         self.assertEqual("Tempo", layout.crumb("tempo"))
