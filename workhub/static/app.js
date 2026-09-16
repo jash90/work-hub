@@ -107,6 +107,9 @@ async function follow(ids) {
 }
 
 document.addEventListener('click', async (event) => {
+  if (event.target.closest('[data-drawer-open]')) return setDrawer(true);
+  if (event.target.closest('[data-drawer-close]')) return setDrawer(false);
+
   const theme = event.target.closest('[data-theme-toggle]');
 
   if (theme) {
@@ -342,14 +345,27 @@ function bind(root) {
   bindTempo(root);
 }
 
-function markOverflow() {
-  const tabs = document.querySelector('.tabs');
+/* ---------- drawer ---------- */
 
-  if (tabs) tabs.classList.toggle('overflowing', tabs.scrollWidth > tabs.clientWidth + 1);
+function setDrawer(open) {
+  const drawer = document.getElementById('drawer');
+  const overlay = document.querySelector('.drawer-overlay');
+  const trigger = document.querySelector('[data-drawer-open]');
+
+  if (!drawer) return;
+
+  drawer.hidden = !open;
+  if (overlay) overlay.hidden = !open;
+  if (trigger) trigger.setAttribute('aria-expanded', String(open));
+  document.body.style.overflow = open ? 'hidden' : '';
+
+  if (open) (drawer.querySelector('a.on') || drawer.querySelector('a'))?.focus();
+  else trigger?.focus();
 }
 
-window.addEventListener('resize', markOverflow);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') setDrawer(false);
+});
 
 applyTheme(readTheme());
 bind(document);
-markOverflow();

@@ -52,11 +52,9 @@ class Command:
 
 
 class Panel:
-    def __init__(self, id, label, blurb, groups, commands, timeout=120, short=None):
+    def __init__(self, id, label, blurb, groups, commands, timeout=120):
         self.id = id
         self.label = label
-        # Tabs carry a shorter name so ten panels fit without a scrolling nav.
-        self.short = short or label
         self.blurb = blurb
         self.groups = tuple(groups)
         self.commands = tuple(commands)
@@ -75,7 +73,6 @@ PANELS = (
         "dashboard", "Moja praca", "Taski do zrobienia, MR-y gotowe do mergu, moje uwagi w cudzych MR-ach, rozjazd Jira ↔ GitLab.",
         (MORNING, AFTERNOON),
         [Command("main", [PY3, skill("my-work-dashboard", "scripts", "dashboard.py"), "--json"])],
-        short="Moja praca",
     ),
     Panel(
         "releases", "Tablica release'owa", "Każde wydanie z moim taskiem, w pełnym składzie zespołu, ze stanem MR-ów.",
@@ -86,19 +83,16 @@ PANELS = (
                                       "--mine-only", "--json"]),
             fallback_note="Pełny skład zespołu niedostępny — Jira odrzuciła zapytanie o wersje (HTTP 400). "
                           "Pokazane są wyłącznie moje taski.")],
-        short="Release'y",
     ),
     Panel(
         "priority", "Priorytet wydania", "Moje nierozwiązane taski uszeregowane po dacie wydania.",
         (MORNING,),
         [Command("main", [PY3, skill("jira-release-priority", "release_priority.py"), "--json"])],
-        short="Priorytet",
     ),
     Panel(
         "review-queue", "Kolejka review", "Cudze otwarte MR-y w kolejności wydań — od czego zacząć review.",
         (MORNING,),
         [Command("main", [PY3, skill("mr-review-queue", "scripts", "build_queue.py"), "--json"])],
-        short="Kolejka",
     ),
     Panel(
         "pr-request", "Prośba o review", "Moje MR-y bez kompletu approve — gotowy post do wklejenia.",
@@ -107,13 +101,11 @@ PANELS = (
             Command("main", [PY3, skill("pr-review-request", "make_post.py"), "--json"]),
             Command("post", [PY3, skill("pr-review-request", "make_post.py")], TEXT),
         ],
-        short="Prośba",
     ),
     Panel(
         "testing", "Moje w testach", "Co wypchnąłem do Internal testing i co z tego przeszło dalej.",
         (MORNING,),
         [Command("main", [PY3, skill("jira-my-testing-status", "check_status.py"), "--json"])],
-        short="W testach",
     ),
     Panel(
         "commits", "Commity dnia", "Co dziś wpadło do repozytoriów i czy jest już na develop.",
@@ -122,7 +114,6 @@ PANELS = (
             Command("commits", [skill("daily-commit-summary", "gather-commits.sh"), "today"], TEXT),
             Command("merge", [skill("daily-commit-summary", "merge-status.sh"), "--no-fetch"], TEXT),
         ],
-        short="Commity",
     ),
     Panel(
         "tempo", "Tempo", "Dni poniżej 8 h i propozycje worklogów wyliczone z commitów.",
@@ -138,7 +129,6 @@ PANELS = (
         [Command("main", lambda: [PY3, skill("protokol-odbioru", "gather.py"),
                                   "--month", current_month(), "--json"])],
         timeout=180,
-        short="Protokół",
     ),
 )
 
@@ -147,3 +137,15 @@ BY_ID = {p.id: p for p in PANELS}
 
 def group_panels(group):
     return [p for p in PANELS if p.scheduled_in(group)]
+
+
+def grouped_panels():
+    """Each panel once, under the earliest group that refreshes it — for nav and overview."""
+    seen = set()
+
+    for group in (MORNING, AFTERNOON, ON_DEMAND):
+        panels = [p for p in group_panels(group) if p.id not in seen]
+        seen.update(p.id for p in panels)
+
+        if panels:
+            yield group, panels

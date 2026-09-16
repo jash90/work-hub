@@ -112,19 +112,41 @@ def state_of(envelope):
     return "stale" if envelope.get("error") else "ok"
 
 
-def nav(active):
-    links = ['<a href="/" class="%s">Przegląd</a>' % ("on" if active == "" else "")]
+def drawer(active):
+    """Navigation lives in a slide-in sheet, grouped the same way the overview is."""
+    sections = []
 
-    for panel in sources.PANELS:
-        links.append('<a href="/p/%s" class="%s" title="%s">%s</a>' % (
-            panel.id, "on" if active == panel.id else "", esc(panel.label), esc(panel.short)))
+    for group, panels in sources.grouped_panels():
+        links = "".join(
+            '<a href="/p/%s" class="%s">%s</a>'
+            % (panel.id, "on" if active == panel.id else "", esc(panel.label))
+            for panel in panels)
+        sections.append('<div class="drawer-group"><h4>%s</h4>%s</div>'
+                        % (esc(sources.GROUP_LABELS[group]), links))
 
-    return '<nav class="tabs">%s</nav>' % "".join(links)
+    return """<div class="drawer-overlay" data-drawer-close hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Nawigacja" hidden>
+  <header class="drawer-head">
+    <span class="brand"><span class="dot"></span>work-hub</span>
+    <span class="spacer"></span>
+    <button class="ghost icon" data-drawer-close aria-label="Zamknij nawigację">✕</button>
+  </header>
+  <nav class="drawer-nav">
+    <a href="/" class="%s">Przegląd</a>
+    %s
+  </nav>
+</aside>""" % ("on" if active == "" else "", "".join(sections))
 
 
 # Applied before first paint so a dark theme never flashes white on load.
 THEME_BOOT = ("<script>try{var t=localStorage.getItem('work-hub-theme');"
               "if(t&&t!=='auto')document.documentElement.dataset.theme=t;}catch(e){}</script>")
+
+
+def crumb(active):
+    panel = sources.BY_ID.get(active)
+
+    return panel.label if panel else "Przegląd"
 
 
 def page(title, active, body, csrf):
@@ -140,13 +162,16 @@ def page(title, active, body, csrf):
 <body>
 <header class="topbar">
   <div class="topbar-inner">
-    <span class="brand"><span class="dot"></span>work-hub</span>
-    %s
+    <button class="ghost icon" data-drawer-open aria-label="Otwórz nawigację"
+            aria-controls="drawer" aria-expanded="false">☰</button>
+    <a class="brand" href="/"><span class="dot"></span>work-hub</a>
+    <span class="crumb">%s</span>
     <span class="spacer"></span>
     <button class="ghost icon" data-theme-toggle title="Motyw: automatyczny" aria-label="Zmień motyw">◐</button>
     <button class="primary" data-refresh-all>Odśwież wszystko</button>
   </div>
 </header>
+%s
 <div class="page">
 %s
 </div>
@@ -154,7 +179,7 @@ def page(title, active, body, csrf):
 <script src="/static/day-rules.js"></script>
 <script src="/static/app.js"></script>
 </body>
-</html>""" % (esc(csrf), esc(title), THEME_BOOT, nav(active), body)
+</html>""" % (esc(csrf), esc(title), THEME_BOOT, esc(crumb(active)), drawer(active), body)
 
 
 BUCKET_LABELS = {0: "Po terminie", 1: "Nadchodzące", 2: "Bez daty", 3: "Bez wersji"}

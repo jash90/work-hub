@@ -68,22 +68,10 @@ def _card(panel):
                  layout.freshness(envelope), panel.id)
 
 
-def _overview_groups():
-    """Each panel appears once, under the earliest group that refreshes it."""
-    seen = set()
-
-    for group in (sources.MORNING, sources.AFTERNOON, sources.ON_DEMAND):
-        panels = [p for p in sources.group_panels(group) if p.id not in seen]
-        seen.update(p.id for p in panels)
-
-        if panels:
-            yield group, panels
-
-
 def overview(hub):
     groups = []
 
-    for group, panels in _overview_groups():
+    for group, panels in sources.grouped_panels():
         cards = "".join(_card(p) for p in panels)
         groups.append('<section class="block"><h3>%s</h3><div class="grid">%s</div></section>'
                       % (layout.esc(sources.GROUP_LABELS[group]), cards))

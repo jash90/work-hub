@@ -49,6 +49,23 @@ class Rendering(unittest.TestCase):
         self.assertIn("Odśwież", render.body("dashboard", {"payload": None}))
 
 
+class Navigation(unittest.TestCase):
+    def test_drawer_lists_every_panel_exactly_once(self):
+        from workhub import sources
+
+        html = layout.drawer("tempo")
+
+        for panel in sources.PANELS:
+            self.assertEqual(1, html.count('href="/p/%s"' % panel.id), panel.id)
+
+    def test_drawer_marks_the_open_panel(self):
+        self.assertIn('href="/p/tempo" class="on"', layout.drawer("tempo"))
+
+    def test_header_names_the_open_panel(self):
+        self.assertEqual("Tempo", layout.crumb("tempo"))
+        self.assertEqual("Przegląd", layout.crumb(""))
+
+
 class Escaping(unittest.TestCase):
     def test_summary_is_escaped(self):
         payload = {"main": dict(DASHBOARD["main"],
