@@ -38,4 +38,16 @@ function dayVerdict(hours, target, partial) {
   return { total, problem, note, ok: !problem };
 }
 
-if (typeof module !== 'undefined') module.exports = { QUARTER, round15, fmt, parseHours, dayVerdict };
+// Mirrors redge_work.polish.plural — the same rule, on the other side of the wire.
+function plural(n, one, few, many) {
+  if (n === 1) return `${n} ${one}`;
+
+  const teens = n % 100;
+  const last = n % 10;
+
+  return `${n} ${last >= 2 && last <= 4 && !(teens >= 12 && teens <= 14) ? few : many}`;
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = { QUARTER, round15, fmt, parseHours, dayVerdict, plural };
+}

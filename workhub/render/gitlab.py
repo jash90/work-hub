@@ -6,6 +6,19 @@ from .layout import chip, copy_button, empty, esc, link, section, table
 STATE_TONES = {"nowy": "accent", "re-review": "wait"}
 
 
+PICKER = """<div class="picker" data-picker>
+  <label class="switch"><input type="checkbox" data-pick-all> zaznacz wszystkie</label>
+  <span class="muted" data-pick-count>nic nie zaznaczone</span>
+  <span class="spacer"></span>
+  <button data-pick-copy disabled>Skopiuj linki</button>
+</div>"""
+
+
+def _pick_box(item):
+    return ('<input type="checkbox" class="pick" data-url="%s" aria-label="zaznacz MR !%s">'
+            % (esc(item.get("web_url")), esc(item.get("iid"))))
+
+
 def queue_body(payload):
     data = payload["main"]
     rows = []
@@ -20,6 +33,7 @@ def queue_body(payload):
             marks.append(chip("draft"))
 
         rows.append([
+            _pick_box(item),
             link(item.get("web_url"), "!%s" % item.get("iid"), mono=True),
             '<span class="repo">%s</span>' % esc(item.get("project", "").split("/")[-1]),
             esc(item.get("version_name") or "—"),
@@ -28,9 +42,9 @@ def queue_body(payload):
             " ".join(marks),
         ])
 
-    blocks = [section("Kolejka", table(
-        ["MR", "Repo", "Wydanie", "Autor", "Tytuł", "Stan"], rows)
-        or empty("Kolejka pusta — nie ma czego reviewować."), chip(str(len(rows))))]
+    queue = (PICKER + table(["", "MR", "Repo", "Wydanie", "Autor", "Tytuł", "Stan"], rows)
+             if rows else empty("Kolejka pusta — nie ma czego reviewować."))
+    blocks = [section("Kolejka", queue, chip(str(len(rows))))]
 
     skipped = data.get("skipped") or []
 

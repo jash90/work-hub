@@ -141,12 +141,9 @@ function bindCopy(root) {
         Uint8Array.from(atob(button.dataset.copy), (c) => c.charCodeAt(0)),
       );
 
-      try {
-        await navigator.clipboard.writeText(text);
-        toast('Skopiowane do schowka', 'ok');
-      } catch (e) {
-        toast('Przeglądarka nie dała dostępu do schowka', 'bad');
-      }
+      const ok = await toClipboard(text);
+      toast(ok ? 'Skopiowane do schowka' : 'Przeglądarka nie dała dostępu do schowka',
+            ok ? 'ok' : 'bad');
     };
   }
 }
@@ -340,9 +337,74 @@ async function undoDay(day, button) {
         data.ok ? 'ok' : 'bad', data.ok ? 4000 : 9000);
 }
 
+/* ---------- picking merge requests out of the review queue ---------- */
+
+async function toClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+
+    return true;
+  } catch (e) {
+    // Clipboard access can be refused; a textarea + execCommand still works on localhost.
+    const field = document.createElement('textarea');
+    field.value = text;
+    field.setAttribute('readonly', '');
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    document.body.appendChild(field);
+    field.select();
+
+    const ok = document.execCommand('copy');
+    field.remove();
+
+    return ok;
+  }
+}
+
+function bindPicker(root) {
+  for (const picker of root.querySelectorAll('[data-picker]')) {
+    const scope = picker.closest('section') || root;
+    const boxes = () => [...scope.querySelectorAll('.pick')];
+    const picked = () => boxes().filter((box) => box.checked);
+    const count = picker.querySelector('[data-pick-count]');
+    const copy = picker.querySelector('[data-pick-copy]');
+    const all = picker.querySelector('[data-pick-all]');
+
+    const update = () => {
+      const chosen = picked();
+      count.textContent = chosen.length
+        ? `${chosen.length} z ${plural(boxes().length, 'MR-a', 'MR-ów', 'MR-ów')}`
+        : 'nic nie zaznaczone';
+      copy.disabled = !chosen.length;
+      all.checked = chosen.length > 0 && chosen.length === boxes().length;
+      all.indeterminate = chosen.length > 0 && chosen.length < boxes().length;
+    };
+
+    all.onchange = () => {
+      for (const box of boxes()) box.checked = all.checked;
+
+      update();
+    };
+
+    scope.addEventListener('change', (event) => {
+      if (event.target.classList.contains('pick')) update();
+    });
+
+    copy.onclick = async () => {
+      const links = picked().map((box) => box.dataset.url);
+      const ok = await toClipboard(links.join('\n'));
+      toast(ok ? `Skopiowano ${plural(links.length, 'link', 'linki', 'linków')}`
+               : 'Przeglądarka nie dała dostępu do schowka', ok ? 'ok' : 'bad');
+    };
+
+    update();
+  }
+}
+
 function bind(root) {
   bindCopy(root);
   bindTempo(root);
+  bindPicker(root);
 }
 
 /* ---------- sidebar (only collapsible on a narrow screen) ---------- */

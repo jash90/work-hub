@@ -116,6 +116,16 @@ the scrim or a link, because a fixed rail would eat a phone screen; above it, it
 part of the layout. The header carries the current panel's name, the theme toggle and the
 global refresh.
 
+### Picking merge requests out of the queue
+
+Rows in the review queue carry a checkbox. Pick several, hit **Skopiuj linki** and their
+URLs land in the clipboard, one per line — the master checkbox goes indeterminate on a
+partial selection, and the counter says how many of how many are picked. Selection is
+per-page state; nothing is stored and nothing is sent.
+
+Clipboard access can be refused even on localhost, so the copy falls back to a hidden
+textarea and `execCommand` rather than failing silently.
+
 ### Ticket → merge request
 
 Every ticket number on a task-shaped panel carries a clickable `!706` chip pointing at the

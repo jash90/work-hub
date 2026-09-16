@@ -412,6 +412,8 @@ time.stamp { font-size: 12px; color: hsl(var(--muted-foreground)); font-variant-
 
 /* ---------- table ---------- */
 
+.table-scroll { overflow-x: auto; }
+
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
 
 th {
@@ -443,6 +445,33 @@ code, .mono, .key { font-family: var(--mono); font-size: 12.5px; }
 .mr-link:hover { text-decoration: none; }
 .mr-link:hover .chip { border-color: hsl(var(--ring)); }
 .mr-link + .mr-link { margin-left: 4px; }
+
+/* ---------- picking rows out of a table ---------- */
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) - 2px);
+  background: hsl(var(--muted) / 0.4);
+}
+
+.picker .muted { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+input.pick {
+  width: 15px;
+  height: 15px;
+  margin: 2px 0 0;
+  accent-color: hsl(var(--primary));
+  cursor: pointer;
+}
+
+td:has(input.pick) { width: 1%; padding-right: 4px; }
+tbody tr:has(input.pick:checked) { background: hsl(var(--accent)); }
 .muted { color: hsl(var(--muted-foreground)); }
 
 section.block { margin-bottom: 30px; }

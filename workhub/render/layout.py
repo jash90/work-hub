@@ -206,7 +206,9 @@ def table(headers, rows):
     head = "".join("<th>%s</th>" % esc(h) for h in headers)
     body = "".join("<tr>%s</tr>" % "".join("<td>%s</td>" % c for c in row) for row in rows)
 
-    return "<table><thead><tr>%s</tr></thead><tbody>%s</tbody></table>" % (head, body)
+    # Wrapped so a wide table scrolls inside its card instead of widening the whole page.
+    return ('<div class="table-scroll"><table><thead><tr>%s</tr></thead><tbody>%s</tbody>'
+            "</table></div>") % (head, body)
 
 
 def when(row):
