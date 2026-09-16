@@ -368,7 +368,11 @@ function bindPicker(root) {
     const picked = () => boxes().filter((box) => box.checked);
     const count = picker.querySelector('[data-pick-count]');
     const copy = picker.querySelector('[data-pick-copy]');
-    const all = picker.querySelector('[data-pick-all]');
+    const masters = [...picker.querySelectorAll('[data-pick-all]')];
+
+    // A master with no value covers everything; one with a state covers that state alone.
+    const scopeOf = (master) => boxes().filter(
+      (box) => !master.dataset.pickAll || box.dataset.state === master.dataset.pickAll);
 
     const update = () => {
       const chosen = picked();
@@ -376,15 +380,22 @@ function bindPicker(root) {
         ? `${chosen.length} z ${plural(boxes().length, 'MR-a', 'MR-ów', 'MR-ów')}`
         : 'nic nie zaznaczone';
       copy.disabled = !chosen.length;
-      all.checked = chosen.length > 0 && chosen.length === boxes().length;
-      all.indeterminate = chosen.length > 0 && chosen.length < boxes().length;
+
+      for (const master of masters) {
+        const scope = scopeOf(master);
+        const taken = scope.filter((box) => box.checked).length;
+        master.checked = taken > 0 && taken === scope.length;
+        master.indeterminate = taken > 0 && taken < scope.length;
+      }
     };
 
-    all.onchange = () => {
-      for (const box of boxes()) box.checked = all.checked;
+    for (const master of masters) {
+      master.onchange = () => {
+        for (const box of scopeOf(master)) box.checked = master.checked;
 
-      update();
-    };
+        update();
+      };
+    }
 
     scope.addEventListener('change', (event) => {
       if (event.target.classList.contains('pick')) update();

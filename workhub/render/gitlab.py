@@ -1,4 +1,6 @@
 """Panels about merge requests: the review queue and the review-request post."""
+from collections import Counter
+
 from redge_work.polish import plural
 
 from .layout import chip, copy_button, empty, esc, link, section, table
@@ -6,17 +8,33 @@ from .layout import chip, copy_button, empty, esc, link, section, table
 STATE_TONES = {"nowy": "accent", "re-review": "wait"}
 
 
-PICKER = """<div class="picker" data-picker>
-  <label class="switch"><input type="checkbox" data-pick-all> zaznacz wszystkie</label>
-  <span class="muted" data-pick-count>nic nie zaznaczone</span>
-  <span class="spacer"></span>
-  <button data-pick-copy disabled>Skopiuj linki</button>
-</div>"""
+# The queue's own vocabulary for how much attention an MR needs.
+STATE_PICK_LABELS = {"nowy": "nowe", "re-review": "re-review"}
 
 
 def _pick_box(item):
-    return ('<input type="checkbox" class="pick" data-url="%s" aria-label="zaznacz MR !%s">'
-            % (esc(item.get("web_url")), esc(item.get("iid"))))
+    return ('<input type="checkbox" class="pick" data-url="%s" data-state="%s"'
+            ' aria-label="zaznacz MR !%s">'
+            % (esc(item.get("web_url")), esc(item.get("state") or ""), esc(item.get("iid"))))
+
+
+def _picker(items):
+    """One toggle for everything, plus one per state so a whole kind can be picked at once."""
+    counts = Counter(item.get("state") for item in items if item.get("state"))
+    toggles = ['<label class="switch"><input type="checkbox" data-pick-all=""> wszystkie</label>']
+
+    for state in sorted(counts, key=lambda s: (-counts[s], s)):
+        toggles.append(
+            '<label class="switch"><input type="checkbox" data-pick-all="%s"> %s'
+            ' <span class="muted">(%d)</span></label>'
+            % (esc(state), esc(STATE_PICK_LABELS.get(state, state)), counts[state]))
+
+    return """<div class="picker" data-picker>
+  %s
+  <span class="muted" data-pick-count>nic nie zaznaczone</span>
+  <span class="spacer"></span>
+  <button data-pick-copy disabled>Skopiuj linki</button>
+</div>""" % "".join(toggles)
 
 
 def queue_body(payload):
@@ -42,7 +60,8 @@ def queue_body(payload):
             " ".join(marks),
         ])
 
-    queue = (PICKER + table(["", "MR", "Repo", "Wydanie", "Autor", "Tytuł", "Stan"], rows)
+    items = data.get("queue") or []
+    queue = (_picker(items) + table(["", "MR", "Repo", "Wydanie", "Autor", "Tytuł", "Stan"], rows)
              if rows else empty("Kolejka pusta — nie ma czego reviewować."))
     blocks = [section("Kolejka", queue, chip(str(len(rows))))]
 

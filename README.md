@@ -119,9 +119,14 @@ global refresh.
 ### Picking merge requests out of the queue
 
 Rows in the review queue carry a checkbox. Pick several, hit **Skopiuj linki** and their
-URLs land in the clipboard, one per line — the master checkbox goes indeterminate on a
-partial selection, and the counter says how many of how many are picked. Selection is
-per-page state; nothing is stored and nothing is sent.
+URLs land in the clipboard, one per line. Beside the **wszystkie** toggle there is one per
+queue state — **nowe** and **re-review**, each with its count — so a whole kind can be taken
+in one click; every toggle goes indeterminate when only part of its rows are picked, and the
+counter says how many of how many. Selection is per-page state; nothing is stored and
+nothing is sent.
+
+The state toggles are generated from the states actually present in the payload, so a new
+one coming out of `mr-review-queue` appears on its own.
 
 Clipboard access can be refused even on localhost, so the copy falls back to a hidden
 textarea and `execCommand` rather than failing silently.
