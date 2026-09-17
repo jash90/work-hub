@@ -23,6 +23,14 @@ def _mr_marks(mrs):
     return " ".join(marks)
 
 
+def _warnings(data):
+    """The skill says when a release could not be expanded; a board silently missing a
+    team roster looks complete, which is worse than one that admits the gap."""
+    said = (data.get("meta") or {}).get("warnings") or []
+
+    return "".join('<div class="banner warn">%s</div>' % esc(w) for w in said)
+
+
 def body(payload):
     data = payload["main"]
     issues = data.get("issues") or []
@@ -32,7 +40,7 @@ def body(payload):
     for issue in issues:
         groups[(issue.get("release_date") or "9999", issue.get("release_name") or "No version")].append(issue)
 
-    blocks = [notes(payload)]
+    blocks = [notes(payload), _warnings(data)]
 
     for (date, name), items in sorted(groups.items()):
         rows = []

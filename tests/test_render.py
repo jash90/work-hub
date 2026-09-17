@@ -2,7 +2,7 @@ import unittest
 
 from . import context  # noqa: F401
 from workhub import render
-from workhub.render import layout
+from workhub.render import layout, releases
 
 DASHBOARD = {"main": {
     "min_approvals": 2,
@@ -243,3 +243,25 @@ class TicketLinks(unittest.TestCase):
     def test_without_an_address_the_key_is_plain_text_not_a_broken_link(self):
         self.assertNotIn("href", layout.ticket_link("ABC-1"))
         self.assertIn("ABC-1", layout.ticket_link("ABC-1"))
+
+
+class ReleaseWarnings(unittest.TestCase):
+    """A release the skill could not expand must say so — a silent gap looks like a full board."""
+
+    def payload(self, warnings):
+        return {"main": {"issues": [], "mrs": {}, "history": [],
+                         "meta": {"warnings": warnings}}}
+
+    def test_a_warning_from_the_skill_reaches_the_page(self):
+        html = releases.body(self.payload(["Jira no longer knows: Ghost 9.9.9"]))
+
+        self.assertIn("banner warn", html)
+        self.assertIn("Ghost 9.9.9", html)
+
+    def test_no_warning_adds_no_banner(self):
+        self.assertNotIn("banner warn", releases.body(self.payload([])))
+
+    def test_a_payload_without_meta_still_renders(self):
+        html = releases.body({"main": {"issues": [], "mrs": {}}})
+
+        self.assertNotIn("banner warn", html)
