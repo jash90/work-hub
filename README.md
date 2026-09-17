@@ -45,21 +45,40 @@ Override the times with `WORK_HUB_PORANEK=10:30` / `WORK_HUB_POPOLUDNIE=17:00`.
 
 ## Writing to Jira
 
-Exactly one route changes anything outside this machine: `POST /api/tempo/log`, which runs
-`tempo-fill`'s `tempo.py log <day> --yes`. It needs a click, a confirmation dialog and an
-explicit `confirm: true` in the body. **No automatic job ever posts** — the 16:00 run only
-computes proposals. Every attempt is appended to `data/write-log.jsonl`, and every guard
-(weekend, holiday, day already logged, total ≠ 8 h) stays in the skill.
+Three routes change anything outside this machine, all of them under `POST /api/tempo/`:
+`log` (a day with nothing in Tempo yet), `replace` (make a day match a given split) and
+`undo`. Each runs the matching `tempo-fill` subcommand with `--yes`, and each needs a click,
+a confirmation dialog and an explicit `confirm: true` in the body. **No automatic job ever
+posts** — the 16:00 run only computes proposals. Every attempt is appended to
+`data/write-log.jsonl`, and every guard (weekend, holiday, the daily total, the 15-minute
+grid, a worklog id that is not really there) stays in the skill.
+
+`replace` is declarative: the entries it is given are the day's wanted end state, not a list
+of operations. An entry prefixed with a worklog id is one Tempo already holds, an entry
+without one is new, and a worklog the split does not mention is deleted. An empty split
+therefore clears the day — which also works on worklogs this tool never wrote, unlike
+`undo`, which can only take back what it recorded in `state/<day>.json`. That ledger is
+rewritten from Tempo after every `replace`, or `undo` would later chase ids that are gone.
 
 ### The Tempo day editor
 
-Each proposed day is editable before it is written. Hours move on the skill's own 15-minute
-grid — `−`/`+` buttons, arrow keys, or typing — and the running total, the hint line and the
-submit button update together. The day cannot be submitted until it is actually writable, so
-a bad split is caught in the browser instead of coming back as the skill's `sys.exit`.
+The month is walked one week at a time, and every workday in it is an editor: a day Tempo
+already holds opens with its own worklogs, a day it holds nothing of opens with the proposal
+derived from commits. **One day, one editor** — two cards for the same day would mean two
+truths about it, and the stale one would be the easier to submit. Weekends and holidays are
+shown but not editable; the skill refuses to write them anyway.
+
+Hours move on the skill's own 15-minute grid — `−`/`+` buttons, arrow keys, or typing — and
+the running total, the hint line and the submit button update together. The day cannot be
+submitted until it is actually writable, so a bad split is caught in the browser instead of
+coming back as the skill's `sys.exit`.
 
 - entries can be removed, and a ticket can be added by key for work with no commit behind it;
-- **niepełny dzień** is an explicit opt-in that passes `--allow-partial` for a day that is not 8 h;
+- **niepełny dzień** and **nadgodziny** are separate opt-ins, passing `--allow-partial` and
+  `--allow-overtime`. They are separate because the skill treats the two directions
+  separately: neither flag quietly excuses the other;
+- a written day is greyed out until the panel refresh lands. Its worklog ids are a moment
+  old, so a second submit would post the new rows again rather than edit them;
 - hour fields are text, not `type=number`: Chrome renders a number input in the page locale, so
   a Polish decimal comma typed by hand would read back as an empty value. `parseHours` accepts
   `1,75` and `1.75` alike, and flags anything else instead of silently treating it as zero;

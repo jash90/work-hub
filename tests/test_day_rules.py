@@ -16,7 +16,7 @@ const cases = JSON.parse(process.argv[1]);
 const out = cases.map((c) => {
   if (c.kind === 'parse') return parseHours(c.raw);
   if (c.kind === 'round') return round15(c.value);
-  return dayVerdict(c.hours.map((h) => (h === 'zle' ? parseHours('abc') : h)), c.target, c.partial);
+  return dayVerdict(c.hours.map((h) => (h === 'zle' ? parseHours('abc') : h)), c.target, c.partial, c.overtime);
 });
 process.stdout.write(JSON.stringify(out));
 """
@@ -35,8 +35,9 @@ def node_run(cases):
 
 @unittest.skipUnless(shutil.which("node"), "node nie jest zainstalowany")
 class DayVerdict(unittest.TestCase):
-    def verdict(self, hours, target=8, partial=False):
-        return node_run([{"kind": "day", "hours": hours, "target": target, "partial": partial}])[0]
+    def verdict(self, hours, target=8, partial=False, overtime=False):
+        return node_run([{"kind": "day", "hours": hours, "target": target,
+                          "partial": partial, "overtime": overtime}])[0]
 
     def test_a_full_day_may_be_written(self):
         verdict = self.verdict([5, 1.75, 1.25])
@@ -55,6 +56,25 @@ class DayVerdict(unittest.TestCase):
 
         self.assertTrue(verdict["ok"])
         self.assertIn("niepełny dzień", verdict["note"])
+
+    def test_a_long_day_is_blocked_and_says_by_how_much(self):
+        verdict = self.verdict([8, 1])
+
+        self.assertFalse(verdict["ok"])
+        self.assertIn("1 h ponad 8 h", verdict["problem"])
+
+    def test_a_long_day_passes_when_marked_overtime(self):
+        verdict = self.verdict([8, 1], overtime=True)
+
+        self.assertTrue(verdict["ok"])
+        self.assertIn("nadgodziny", verdict["note"])
+
+    def test_partial_does_not_quietly_allow_overtime(self):
+        """The skill treats the two directions separately; the browser must not be laxer."""
+        self.assertFalse(self.verdict([9], partial=True)["ok"])
+
+    def test_overtime_does_not_quietly_allow_a_short_day(self):
+        self.assertFalse(self.verdict([6], overtime=True)["ok"])
 
     def test_hours_off_the_fifteen_minute_grid_are_blocked(self):
         """The skill exits on this; catching it in the browser saves a round trip."""

@@ -79,6 +79,27 @@ class Guards(unittest.TestCase):
         self.assertEqual(400, status)
         self.assertIn("format", body)
 
+    def test_tempo_replace_is_guarded_like_a_write_because_it_is_one(self):
+        """It edits and deletes worklogs, so it must not be reachable more cheaply than log."""
+        status, body = self.call("/api/tempo/replace", "POST",
+                                 {"day": "2026-09-07", "entries": "ABC-1=8"},
+                                 {"X-CSRF": self.csrf})
+
+        self.assertEqual(400, status)
+        self.assertIn("potwierdzenia", body)
+
+        status, body = self.call("/api/tempo/replace", "POST",
+                                 {"day": "wczoraj", "confirm": True}, {"X-CSRF": self.csrf})
+
+        self.assertEqual(400, status)
+        self.assertIn("format", body)
+
+    def test_tempo_replace_needs_the_csrf_token(self):
+        status, _ = self.call("/api/tempo/replace", "POST",
+                              {"day": "2026-09-07", "confirm": True}, {})
+
+        self.assertEqual(403, status)
+
     # ---------- static files ----------
 
     def test_static_path_cannot_escape(self):

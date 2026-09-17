@@ -157,6 +157,9 @@ function dayEntries(day) {
   return [...day.querySelectorAll('[data-entry]')].map((row) => ({
     row,
     key: row.querySelector('.entry-key a, .entry-key').textContent.trim(),
+    // A row that came out of Tempo carries its worklog id, so an edit lands on that entry
+    // instead of adding a second one beside it.
+    id: row.dataset.worklogId || '',
     hours: readHours(row.querySelector('.hours')),
   }));
 }
@@ -165,7 +168,8 @@ function refreshDay(day) {
   const all = dayEntries(day);
   const target = Number(day.dataset.target);
   const partial = day.querySelector('[data-partial]').checked;
-  const verdict = dayVerdict(all.map((e) => e.hours), target, partial);
+  const overtime = day.querySelector('[data-overtime]').checked;
+  const verdict = dayVerdict(all.map((e) => e.hours), target, partial, overtime);
 
   for (const entry of all) {
     entry.row.querySelector('.hours').setAttribute('aria-invalid', String(Number.isNaN(entry.hours)));
@@ -184,11 +188,24 @@ function refreshDay(day) {
   submit.disabled = !verdict.ok;
   submit.title = verdict.problem || 'Zapisze worklogi w Tempo';
 
-  return { entries: all.filter((e) => e.hours > 0), total: verdict.total, partial };
+  return { entries: all.filter((e) => e.hours > 0), total: verdict.total, partial, overtime };
+}
+
+// A written day still shows what was on screen a moment ago: the ids it holds are stale and
+// a second submit would post the new rows again. The panel refresh runs in the background,
+// so the card is closed until it arrives rather than left looking editable.
+function markStale(day, note) {
+  day.dataset.stale = 'yes';
+
+  for (const field of day.querySelectorAll('input, button')) field.disabled = true;
+
+  const hint = day.querySelector('[data-hint]');
+  hint.textContent = note;
+  hint.dataset.tone = 'ok';
 }
 
 function entriesString(entries) {
-  return entries.map((e) => `${e.key}=${fmt(e.hours)}`).join(',');
+  return entries.map((e) => `${e.id ? `${e.id}:` : ''}${e.key}=${fmt(e.hours)}`).join(',');
 }
 
 function addEntryRow(day, key, hours) {
@@ -212,7 +229,8 @@ function addEntryRow(day, key, hours) {
 }
 
 function bindTempo(root) {
-  for (const day of root.querySelectorAll('.day')) {
+  // Only the editors: a weekend card is a `.day` too, and it carries no switches to read.
+  for (const day of root.querySelectorAll('.day[data-day]')) {
     const update = () => refreshDay(day);
 
     day.addEventListener('input', (event) => {
@@ -220,7 +238,7 @@ function bindTempo(root) {
     });
 
     day.addEventListener('change', (event) => {
-      if (event.target.matches('[data-partial]')) update();
+      if (event.target.matches('[data-partial], [data-overtime]')) update();
 
       if (event.target.classList.contains('hours')) {
         const hours = readHours(event.target);
@@ -288,53 +306,99 @@ function bindTempo(root) {
 
       const log = event.target.closest('[data-tempo-log]');
       const undo = event.target.closest('[data-tempo-undo]');
+      const clear = event.target.closest('[data-tempo-clear]');
 
       if (log) await submitDay(day, log);
       if (undo) await undoDay(day, undo);
+      if (clear) await clearDay(day, clear);
     });
 
     update();
   }
 }
 
-async function submitDay(day, button) {
-  const { entries, total, partial } = refreshDay(day);
-
-  if (day.dataset.valid !== 'yes') return;
-
-  const listing = entries.map((e) => `  ${e.key} — ${fmt(e.hours)} h`).join('\n');
-  const label = partial && total !== Number(day.dataset.target) ? ' (niepełny dzień)' : '';
-
-  if (!confirm(`Zapisać worklogi w Tempo za ${day.dataset.day}${label}?\n\n${listing}\n\nRazem ${fmt(total)} h. To jest realny POST do Jiry.`)) return;
-
+async function write(day, button, body, done) {
   button.disabled = true;
   button.setAttribute('aria-busy', 'true');
 
-  const { data } = await post('/api/tempo/log', {
-    day: day.dataset.day,
-    entries: entriesString(entries),
-    allow_partial: partial,
-    confirm: true,
-  });
+  const { data } = await post(body.endpoint, { ...body.payload, day: day.dataset.day, confirm: true });
 
   button.removeAttribute('aria-busy');
   button.disabled = false;
-  toast(data.ok ? `Zalogowano ${day.dataset.day} — ${fmt(total)} h` : `Odmowa: ${(data.output || data.error || '').slice(0, 200)}`,
+
+  if (data.ok) markStale(day, done);
+
+  toast(data.ok ? done : `Odmowa: ${(data.output || data.error || '').slice(0, 200)}`,
         data.ok ? 'ok' : 'bad', data.ok ? 4000 : 9000);
 }
 
+async function submitDay(day, button) {
+  const { entries, total, partial, overtime } = refreshDay(day);
+
+  if (day.dataset.valid !== 'yes' || day.dataset.stale) return;
+
+  const target = Number(day.dataset.target);
+  const listing = entries.map((e) => `  ${e.key} — ${fmt(e.hours)} h`).join('\n');
+  let label = '';
+
+  if (total < target) label = ' (niepełny dzień)';
+  else if (total > target) label = ' (nadgodziny)';
+
+  if (!confirm(`Zapisać worklogi w Tempo za ${day.dataset.day}${label}?\n\n${listing}\n\nRazem ${fmt(total)} h. To jest realny POST do Jiry.`)) return;
+
+  await write(day, button, {
+    endpoint: day.dataset.endpoint,
+    payload: { entries: entriesString(entries), allow_partial: partial, allow_overtime: overtime },
+  }, `Zapisano ${day.dataset.day} — ${fmt(total)} h`);
+}
+
+// Clearing goes through the same declarative route as an edit: an empty split is a day with
+// nothing in it, so it works on worklogs this tool never wrote.
+async function clearDay(day, button) {
+  if (day.dataset.stale) return;
+
+  if (!confirm(`Wyczyścić ${day.dataset.day} w Tempo? Skasuje wszystkie worklogi tego dnia.`)) return;
+
+  await write(day, button, { endpoint: '/api/tempo/replace', payload: { entries: '' } },
+              `Wyczyszczono ${day.dataset.day}`);
+}
+
 async function undoDay(day, button) {
+  if (day.dataset.stale) return;
+
   if (!confirm(`Cofnąć worklogi za ${day.dataset.day}? Skasuje je z Jiry.`)) return;
 
-  button.disabled = true;
-  button.setAttribute('aria-busy', 'true');
+  await write(day, button, { endpoint: '/api/tempo/undo', payload: {} }, `Cofnięto ${day.dataset.day}`);
+}
 
-  const { data } = await post('/api/tempo/undo', { day: day.dataset.day, confirm: true });
+function bindWeeks(root) {
+  for (const weeks of root.querySelectorAll('[data-weeks]')) {
+    const sections = [...weeks.querySelectorAll('.week')];
+    const label = weeks.querySelector('[data-week-label]');
+    const total = weeks.querySelector('[data-week-total]');
+    const steps = [...weeks.querySelectorAll('[data-week-step]')];
 
-  button.removeAttribute('aria-busy');
-  button.disabled = false;
-  toast(data.ok ? `Cofnięto ${day.dataset.day}` : `Nie udało się: ${(data.output || '').slice(0, 200)}`,
-        data.ok ? 'ok' : 'bad', data.ok ? 4000 : 9000);
+    const show = (index) => {
+      const active = Math.min(Math.max(index, 0), sections.length - 1);
+      weeks.dataset.active = String(active);
+
+      for (const [at, week] of sections.entries()) week.hidden = at !== active;
+
+      label.textContent = sections[active].dataset.label;
+      total.textContent = sections[active].dataset.total;
+
+      for (const step of steps) {
+        const to = active + Number(step.dataset.weekStep);
+        step.disabled = to < 0 || to > sections.length - 1;
+      }
+    };
+
+    for (const step of steps) {
+      step.onclick = () => show(Number(weeks.dataset.active) + Number(step.dataset.weekStep));
+    }
+
+    show(Number(weeks.dataset.active));
+  }
 }
 
 /* ---------- picking merge requests out of the review queue ---------- */
@@ -415,6 +479,7 @@ function bindPicker(root) {
 function bind(root) {
   bindCopy(root);
   bindTempo(root);
+  bindWeeks(root);
   bindPicker(root);
 }
 

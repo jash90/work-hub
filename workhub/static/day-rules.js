@@ -1,6 +1,7 @@
 // Whether a Tempo day may be written — the rules alone, with no DOM in sight, so they can be
 // exercised straight from Node (tests/test_day_rules.py). They mirror the skill's own guards:
-// every entry on the 15-minute grid, and 8 h exactly unless the day is marked partial.
+// every entry on the 15-minute grid, and 8 h exactly unless the day is marked as a short one
+// (partial) or as a long one (overtime) — each direction is its own opt-in, as in the skill.
 const QUARTER = 0.25;
 
 const round15 = (value) => Math.max(0, Math.round(value / QUARTER) * QUARTER);
@@ -18,7 +19,7 @@ function parseHours(raw) {
   return Number.isFinite(value) && value >= 0 ? value : NaN;
 }
 
-function dayVerdict(hours, target, partial) {
+function dayVerdict(hours, target, partial, overtime) {
   const broken = hours.some((h) => Number.isNaN(h));
   const counted = hours.filter((h) => h > 0);
   // Summing 0.25 steps drifts (7 x 0.25 = 1.7500000000000002), so compare rounded hours.
@@ -30,10 +31,14 @@ function dayVerdict(hours, target, partial) {
   if (broken) problem = 'godziny muszą być liczbą, np. 1,75';
   else if (!counted.length) problem = 'dodaj przynajmniej jedną pozycję';
   else if (offGrid) problem = 'godziny muszą być wielokrotnością 15 minut';
-  else if (total !== target && !partial) problem = `brakuje ${fmt(target - total)} h do ${fmt(target)} h`;
+  else if (total < target && !partial) problem = `brakuje ${fmt(target - total)} h do ${fmt(target)} h`;
+  else if (total > target && !overtime) problem = `${fmt(total - target)} h ponad ${fmt(target)} h — zaznacz „nadgodziny”`;
 
-  const note = problem
-    || (partial && total !== target ? `niepełny dzień: ${fmt(total)} h` : 'gotowe do zapisu');
+  let note = 'gotowe do zapisu';
+
+  if (problem) note = problem;
+  else if (total < target) note = `niepełny dzień: ${fmt(total)} h`;
+  else if (total > target) note = `nadgodziny: ${fmt(total)} h`;
 
   return { total, problem, note, ok: !problem };
 }

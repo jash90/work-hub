@@ -549,6 +549,33 @@ label.switch input { accent-color: hsl(var(--primary)); width: 15px; height: 15p
 }
 
 .day[data-valid="no"] { border-color: hsl(var(--warning) / 0.45); }
+.day[data-stale] { opacity: .55; }
+
+/* A month is walked one week at a time: only the active week is in the flow, the rest keep
+   their state in the DOM so stepping back and forth costs nothing. */
+.week-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.week-bar strong { font-size: 14px; font-weight: 600; }
+.week-bar button { padding: 2px 10px; font-size: 14px; line-height: 1.4; }
+.week[hidden] { display: none; }
+
+.day.rest { background: hsl(var(--muted) / 0.35); padding: 10px 16px; }
+.day.rest .day-head { margin-bottom: 0; }
+.rest-entries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
 
 .day-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .day-when { display: flex; align-items: baseline; gap: 8px; }

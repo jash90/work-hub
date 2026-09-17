@@ -73,6 +73,77 @@ class Navigation(unittest.TestCase):
         self.assertEqual("Przegląd", layout.crumb(""))
 
 
+TEMPO = {
+    "gaps": "# brak",
+    "propose": {"plan": [{"day": "2026-09-10", "weekday": "Thu", "total_hours": 8.0,
+                          "entries": [{"key": "ABC-9", "summary": "Propozycja", "hours": 8.0,
+                                       "seconds": 28800, "commits": 3, "subjects": ["x"]}]}],
+                "skipped": []},
+    "worklogs": {"from": "2026-09-07", "to": "2026-09-13", "days": [
+        {"day": "2026-09-07", "weekday": "Mon", "workday": True, "total_hours": 8.0,
+         "entries": [{"id": 1404459, "key": "ABC-1", "summary": "Zalogowane",
+                      "hours": 8.0, "seconds": 28800, "comment": ""}]},
+        {"day": "2026-09-08", "weekday": "Tue", "workday": True, "total_hours": 0, "entries": []},
+        {"day": "2026-09-09", "weekday": "Wed", "workday": True, "total_hours": 0, "entries": []},
+        {"day": "2026-09-10", "weekday": "Thu", "workday": True, "total_hours": 0, "entries": []},
+        {"day": "2026-09-11", "weekday": "Fri", "workday": True, "total_hours": 0, "entries": []},
+        {"day": "2026-09-12", "weekday": "Sat", "workday": False, "total_hours": 0, "entries": []},
+        {"day": "2026-09-13", "weekday": "Sun", "workday": False, "total_hours": 0, "entries": []},
+    ]},
+}
+
+
+class TempoPanel(unittest.TestCase):
+    def html(self, payload=None):
+        return render.RENDERERS["tempo"][0](payload or TEMPO)
+
+    def test_a_logged_day_is_editable_in_place(self):
+        html = self.html()
+
+        self.assertIn('data-worklog-id="1404459"', html)
+        self.assertIn('data-endpoint="/api/tempo/replace"', html)
+        self.assertIn("Zapisz zmiany", html)
+
+    def test_a_day_with_a_proposal_still_goes_through_log(self):
+        html = self.html()
+
+        self.assertIn('data-endpoint="/api/tempo/log"', html)
+        self.assertIn("ABC-9", html)
+
+    def test_a_day_has_exactly_one_editor(self):
+        """Two cards for one day would mean two truths about it, and the stale one submits too."""
+        for day in ("2026-09-07", "2026-09-10"):
+            self.assertEqual(1, self.html().count('data-day="%s"' % day), day)
+
+    def test_both_directions_are_opt_in(self):
+        html = self.html()
+
+        self.assertIn("data-partial", html)
+        self.assertIn("data-overtime", html)
+
+    def test_a_weekend_is_shown_but_not_editable(self):
+        html = self.html()
+
+        self.assertIn("dzień wolny", html)
+        self.assertNotIn('data-day="2026-09-12"', html)
+
+    def test_days_without_worklogs_still_appear(self):
+        """A week missing its quiet days renders as Monday, Tuesday, Thursday."""
+        self.assertIn('data-day="2026-09-09"', self.html())
+
+    def test_the_week_carries_its_own_label_and_total(self):
+        html = self.html()
+
+        self.assertIn('data-label="7 września – 13 września"', html)
+        self.assertIn('data-total="8 h / 40 h"', html)
+
+    def test_it_still_renders_before_the_first_worklog_refresh(self):
+        html = self.html({"gaps": "", "propose": TEMPO["propose"]})
+
+        self.assertIn("ABC-9", html)
+        self.assertNotIn("data-weeks", html)
+
+
 class Escaping(unittest.TestCase):
     def test_summary_is_escaped(self):
         payload = {"main": dict(DASHBOARD["main"],

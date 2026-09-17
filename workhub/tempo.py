@@ -1,9 +1,10 @@
 """The one place in the hub that can change something outside this machine.
 
-`tempo.py log --yes` POSTs worklogs to Jira. Every guard that matters (weekend, public
-holiday, a day that already has worklogs, a total that is not 8 h, the 15-minute grid)
-already lives in the skill — the hub does not re-implement or bypass them, it just relays
-what the script says. Every attempt is appended to data/write-log.jsonl.
+`tempo.py log --yes` POSTs a fresh day's worklogs to Jira; `tempo.py replace --yes` makes a
+day that already has them match a given split. Every guard that matters (weekend, public
+holiday, a day below or above 8 h, the 15-minute grid, a worklog id that is not really
+there) already lives in the skill — the hub does not re-implement or bypass them, it just
+relays what the script says. Every attempt is appended to data/write-log.jsonl.
 """
 import json
 import os
@@ -18,7 +19,8 @@ SCRIPT = sources.skill("tempo-fill", "tempo.py")
 WRITE_LOG = os.path.join(DATA_DIR, "write-log.jsonl")
 DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # The skill parses hours with float(), so a decimal comma would crash it — only a dot passes.
-ENTRY = r"[A-Z][A-Z0-9]*-\d+=\d+(?:\.\d+)?"
+# `replace` prefixes an entry Tempo already holds with its worklog id: 1404473:ABC-1=2.75.
+ENTRY = r"(?:\d+:)?[A-Z][A-Z0-9]*-\d+=\d+(?:\.\d+)?"
 ENTRIES = re.compile(r"^%s(?:,%s)*$" % (ENTRY, ENTRY))
 TIMEOUT = 120
 
@@ -49,9 +51,9 @@ def _run(action, day, argv):
     return result
 
 
-def log_argv(day, entries, allow_partial=False):
+def write_argv(action, day, entries, allow_partial=False, allow_overtime=False):
     """The exact command a write would run — built apart from running it, so it is testable."""
-    argv = ["/usr/bin/python3", SCRIPT, "log", day]
+    argv = ["/usr/bin/python3", SCRIPT, action, day]
 
     if entries:
         argv += ["--entries", entries]
@@ -61,14 +63,25 @@ def log_argv(day, entries, allow_partial=False):
     if allow_partial:
         argv.append("--allow-partial")
 
+    if allow_overtime:
+        argv.append("--allow-overtime")
+
     return argv
 
 
-def log_day(day, entries, allow_partial=False):
-    """POST one day's worklogs. `entries` is the skill's own "KEY=h,KEY=h" notation.
+def log_argv(day, entries, allow_partial=False, allow_overtime=False):
+    return write_argv("log", day, entries, allow_partial, allow_overtime)
 
-    Only the shape is checked here; whether the split is legal (15-minute grid, 8 h total,
-    a workday that is not already logged) stays the skill's call.
+
+def replace_argv(day, entries, allow_partial=False, allow_overtime=False):
+    return write_argv("replace", day, entries, allow_partial, allow_overtime)
+
+
+def write_day(action, day, entries, allow_partial=False, allow_overtime=False):
+    """Run one write. `entries` is the skill's own "KEY=h,KEY=h" notation.
+
+    Only the shape is checked here; whether the split is legal (15-minute grid, the daily
+    total, a workday, a worklog id that belongs to the day) stays the skill's call.
     """
     entries = (entries or "").replace(" ", "")
 
@@ -76,7 +89,20 @@ def log_day(day, entries, allow_partial=False):
         return {"ok": False, "output": "zły format wpisów — oczekiwane KEY=h,KEY=h (godziny z kropką)",
                 "exit_code": None}
 
-    return _run("log", day, log_argv(day, entries, allow_partial))
+    return _run(action, day, write_argv(action, day, entries, allow_partial, allow_overtime))
+
+
+def log_day(day, entries, allow_partial=False, allow_overtime=False):
+    """Write a day that has no worklogs yet."""
+    return write_day("log", day, entries, allow_partial, allow_overtime)
+
+
+def replace_day(day, entries, allow_partial=False, allow_overtime=False):
+    """Make a day match `entries` — the skill edits, deletes and adds to get there.
+
+    An empty `entries` is not a missing argument here but a request to clear the day.
+    """
+    return write_day("replace", day, entries, allow_partial, allow_overtime)
 
 
 def undo_day(day):

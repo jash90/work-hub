@@ -33,6 +33,16 @@ def current_month():
     return datetime.date.today().strftime("%m.%Y")
 
 
+def month_weeks():
+    """(Monday, Sunday) around the current month — whole weeks, so none renders half-empty."""
+    today = datetime.date.today()
+    first = today.replace(day=1)
+    last = (first + datetime.timedelta(31)).replace(day=1) - datetime.timedelta(1)
+
+    return (first - datetime.timedelta(first.weekday()),
+            last + datetime.timedelta(6 - last.weekday()))
+
+
 class Command:
     """One subprocess. `argv` may be a callable when an argument depends on today's date.
 
@@ -116,11 +126,14 @@ PANELS = (
         ],
     ),
     Panel(
-        "tempo", "Tempo", "Dni poniżej 8 h i propozycje worklogów wyliczone z commitów.",
+        "tempo", "Tempo", "Tydzień po tygodniu: co już jest w Tempo i co dopisać z commitów.",
         (AFTERNOON,),
         [
             Command("gaps", [PY3, skill("tempo-fill", "tempo.py"), "gaps"], TEXT),
             Command("propose", [PY3, skill("tempo-fill", "tempo.py"), "propose", "--json"]),
+            Command("worklogs", lambda: [PY3, skill("tempo-fill", "tempo.py"), "worklogs",
+                                         "--from", month_weeks()[0].isoformat(),
+                                         "--to", month_weeks()[1].isoformat(), "--json"]),
         ],
     ),
     Panel(

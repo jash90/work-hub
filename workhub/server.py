@@ -1,9 +1,9 @@
 """The HTTP layer: stdlib only, bound to the loopback interface.
 
-The hub has exactly one route that changes anything outside this machine
-(POST /api/tempo/log). That single fact drives the guards here: loopback-only bind, a Host
-check so a hostile page cannot reach us by DNS rebinding, and a start-up CSRF token that
-every POST must echo.
+The only routes that change anything outside this machine are POST /api/tempo/log,
+/api/tempo/replace and /api/tempo/undo. That single fact drives the guards here:
+loopback-only bind, a Host check so a hostile page cannot reach us by DNS rebinding, and a
+start-up CSRF token that every POST must echo.
 """
 import json
 import os
@@ -124,11 +124,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/refresh":
             return self._refresh(body)
 
-        if path == "/api/tempo/log":
-            return self._tempo_write(body, write=True)
-
-        if path == "/api/tempo/undo":
-            return self._tempo_write(body, write=False)
+        if path in ("/api/tempo/log", "/api/tempo/replace", "/api/tempo/undo"):
+            return self._tempo_write(body, path.rsplit("/", 1)[1])
 
         return self._json(404, {"error": "nieznana trasa"})
 
@@ -187,8 +184,8 @@ class Handler(BaseHTTPRequestHandler):
         for panel_id in targets:
             self.hub.runner.run_panel(panel_id)
 
-    def _tempo_write(self, body, write):
-        """The only path that touches Jira. Never reachable without an explicit confirmation."""
+    def _tempo_write(self, body, action):
+        """The only paths that touch Jira. Never reachable without an explicit confirmation."""
         from . import tempo
 
         if body.get("confirm") is not True:
@@ -199,11 +196,12 @@ class Handler(BaseHTTPRequestHandler):
         if not tempo.is_day(day):
             return self._json(400, {"error": "zły format dnia (YYYY-MM-DD)"})
 
-        if write:
-            result = tempo.log_day(day, (body.get("entries") or "").strip(),
-                               allow_partial=body.get("allow_partial") is True)
-        else:
+        if action == "undo":
             result = tempo.undo_day(day)
+        else:
+            result = tempo.write_day(action, day, (body.get("entries") or "").strip(),
+                                     allow_partial=body.get("allow_partial") is True,
+                                     allow_overtime=body.get("allow_overtime") is True)
 
         threading.Thread(target=self.hub.runner.run_panel, args=("tempo",), daemon=True).start()
 
