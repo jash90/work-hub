@@ -18,9 +18,17 @@ STDERR_TAIL = 500
 
 
 def _env():
+    """What every skill subprocess inherits: the process environment, then `.env` over it.
+
+    os.environ itself is never touched, so a token saved in the settings view reaches the
+    next panel run without a restart and without the hub carrying a secret in memory.
+    """
     import os
 
+    from . import config
+
     env = dict(os.environ)
+    env.update(config.load())
     env["PATH"] = PATH
 
     return env

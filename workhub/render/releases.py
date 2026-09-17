@@ -3,7 +3,7 @@ from collections import defaultdict
 
 from redge_work.polish import plural
 
-from .layout import chip, empty, esc, link, notes, section, table
+from .layout import chip, empty, esc, notes, section, table, ticket_link
 
 PROGRESS_TONES = {"review": "accent", "qa": "wait", "done": "ok", "mine": ""}
 
@@ -40,7 +40,7 @@ def body(payload):
 
         for issue in items:
             rows.append([
-                link("https://jira.example.com/browse/%s" % issue["key"], issue["key"], mono=True),
+                ticket_link(issue["key"]),
                 chip(issue.get("status") or "—", PROGRESS_TONES.get(issue.get("progress"), "")),
                 '<span class="repo">%s</span>' % esc(issue.get("assignee") or "—"),
                 '<span class="summary">%s</span>' % esc(issue.get("summary")),
@@ -56,7 +56,7 @@ def body(payload):
 
     if history:
         rows = [[esc(h.get("ts", "").replace("T", " ")[:16]),
-                 link("https://jira.example.com/browse/%s" % h["key"], h["key"], mono=True),
+                 ticket_link(h["key"]),
                  '<span class="muted">%s → </span>%s' % (esc(h.get("from")), chip(h.get("to") or ""))]
                 for h in history[:25]]
         blocks.append(section("Zmiany statusów", table(["Kiedy", "Ticket", "Przejście"], rows),

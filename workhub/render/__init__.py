@@ -3,7 +3,7 @@
 RENDERERS is the whole dispatch table — one entry per panel in sources.PANELS.
 """
 from .. import links, sources, store
-from . import gitlab, layout, releases, reports, tempo, work
+from . import gitlab, layout, releases, reports, settings, tempo, work
 
 RENDERERS = {
     "dashboard": (work.dashboard_body, work.dashboard_headline),
@@ -89,6 +89,14 @@ def overview(hub):
             '<p>Ostatnie automatyczne przebiegi — %s</p></div>') % layout.esc(schedule)
 
     return layout.page("work-hub", "", head + "".join(groups), hub.csrf)
+
+
+def settings_page(hub):
+    """Not a panel: it has no skill, no envelope and nothing for the scheduler to refresh."""
+    head = ('<div class="page-head"><h1>Ustawienia</h1>'
+            '<p>Tokeny i adresy, których używają skille uruchamiane przez hub.</p></div>')
+
+    return layout.page("Ustawienia — work-hub", "settings", head + settings.page_body(), hub.csrf)
 
 
 def panel_page(hub, panel_id):

@@ -1,6 +1,15 @@
 // Refresh buttons, theme, clipboard briefs and the Tempo day editor.
 // Every POST carries the start-up CSRF token the page holds in <html data-csrf>.
 const CSRF = document.documentElement.dataset.csrf;
+// Both come from the hub's own settings; without an address a ticket number stays plain text.
+const JIRA = document.documentElement.dataset.jira || '';
+const KEY_HINT = (document.documentElement.dataset.keys || '').split(',')[0] || 'ABC';
+
+function ticketLink(key) {
+  return JIRA
+    ? `<a class="key" href="${JIRA}/browse/${key}" target="_blank" rel="noopener">${key}</a>`
+    : `<span class="key">${key}</span>`;
+}
 
 /* ---------- theme ---------- */
 
@@ -214,7 +223,7 @@ function addEntryRow(day, key, hours) {
   row.className = 'entry';
   row.dataset.entry = '';
   row.innerHTML = `
-    <td class="entry-key"><a class="key" href="https://jira.example.com/browse/${key}" target="_blank" rel="noopener">${key}</a></td>
+    <td class="entry-key">${ticketLink(key)}</td>
     <td class="entry-summary"><span class="muted">dodane ręcznie</span></td>
     <td class="entry-commits"></td>
     <td class="entry-hours">
@@ -290,7 +299,7 @@ function bindTempo(root) {
 
         if (!/^[A-Z][A-Z0-9]*-\d+$/.test(key)) {
           keyField.setAttribute('aria-invalid', 'true');
-          toast('Klucz ticketu wygląda jak ABC-1234', 'bad');
+          toast(`Klucz ticketu wygląda jak ${KEY_HINT}-1234`, 'bad');
 
           return;
         }
@@ -476,11 +485,60 @@ function bindPicker(root) {
   }
 }
 
+/* ---------- settings ---------- */
+
+// A secret field is always empty on load, so an untouched one must not be sent: an absent
+// key keeps what is stored, while an explicit empty string is what clears it.
+function settingsValues(root) {
+  const values = {};
+
+  for (const field of root.querySelectorAll('[data-setting]')) {
+    const value = field.value.trim();
+    const secret = field.type === 'password';
+    const cleared = root.querySelector(`[data-setting-clear="${field.dataset.setting}"]`)?.checked;
+
+    if (cleared) values[field.dataset.setting] = '';
+    else if (value || !secret) values[field.dataset.setting] = value;
+  }
+
+  return values;
+}
+
+function bindSettings(root) {
+  const save = root.querySelector('[data-settings-save]');
+
+  if (!save) return;
+
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    save.setAttribute('aria-busy', 'true');
+
+    const { data } = await post('/api/settings', {
+      values: settingsValues(root),
+      sync_secrets: root.querySelector('[data-settings-sync]').checked,
+    });
+
+    save.removeAttribute('aria-busy');
+    save.disabled = false;
+
+    if (!data.ok) {
+      toast(`Nie zapisano: ${(data.error || '').slice(0, 200)}`, 'bad', 9000);
+
+      return;
+    }
+
+    toast(`Zapisano ${data.saved.length} ustawień`, 'ok');
+    // Re-render so every field reports its stored state instead of what was typed into it.
+    setTimeout(() => window.location.reload(), 600);
+  });
+}
+
 function bind(root) {
   bindCopy(root);
   bindTempo(root);
   bindWeeks(root);
   bindPicker(root);
+  bindSettings(root);
 }
 
 /* ---------- sidebar (only collapsible on a narrow screen) ---------- */

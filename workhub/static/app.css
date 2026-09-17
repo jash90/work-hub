@@ -205,6 +205,8 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 .nav-group { margin-top: 16px; }
 .nav-group:first-of-type { margin-top: 12px; }
+/* Settings sit apart from the panels: they are configuration, not something to refresh. */
+.nav-foot { margin-top: 20px; padding-top: 12px; border-top: 1px solid hsl(var(--border)); }
 
 .nav-group h4 {
   margin: 0 0 4px;
@@ -676,3 +678,36 @@ input.hours { -moz-appearance: textfield; }
   .grid { grid-template-columns: 1fr; }
   .panel { padding: 18px 16px; }
 }
+
+/* ---------- settings ---------- */
+
+.settings { max-width: 760px; }
+.setting { padding: 12px 0; border-top: 1px solid hsl(var(--border)); }
+.setting:first-child { border-top: 0; }
+.setting-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.setting-head label { font-size: 14px; font-weight: 600; }
+.setting-control { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+
+.setting-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 11px;
+  font: inherit;
+  font-size: 13px;
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+.setting-input:focus { outline: 2px solid hsl(var(--ring)); outline-offset: -1px; }
+.setting-note { margin: 6px 0 0; font-size: 12px; line-height: 1.5; }
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+  border-top: 1px solid hsl(var(--border));
+}
+.settings-actions .muted { font-size: 12px; }

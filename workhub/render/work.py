@@ -3,7 +3,7 @@ from redge_work.polish import days_ago_phrase, plural
 
 from ..links import merge
 from .layout import (BUCKET_LABELS, BUCKET_TONES, chip, empty, esc, link, mr_links, section,
-                     table, when)
+                     table, ticket_link, when)
 
 REVIEW_LABELS = {
     "waiting_for_me": "czeka na moją odpowiedź",
@@ -23,7 +23,7 @@ def _task_rows(rows, index=None):
     for row in rows:
         mrs = merge(row.get("mrs"), index.get(row["key"]))
         out.append([
-            link("https://jira.example.com/browse/%s" % row["key"], row["key"], mono=True),
+            ticket_link(row["key"]),
             chip(row.get("status") or "—"),
             when(row),
             '<span class="summary">%s</span>' % esc(row.get("summary")),
@@ -185,7 +185,7 @@ def testing_body(payload, index=None):
     moved = [i for i in issues if i.get("status") != status]
 
     def rows(items):
-        return [[link("https://jira.example.com/browse/%s" % i["key"], i["key"], mono=True),
+        return [[ticket_link(i["key"]),
                  chip(i.get("status") or "—", "ok" if i.get("resolution") else ""),
                  '<span class="repo">%s</span>' % esc(i.get("assignee") or "—"),
                  '<span class="summary">%s</span>' % esc(i.get("summary")),

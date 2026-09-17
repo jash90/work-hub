@@ -6,7 +6,7 @@ import time
 
 from redge_work.polish import days_phrase, plural
 
-from .. import sources
+from .. import config, sources
 
 
 def esc(value):
@@ -136,8 +136,10 @@ def sidebar(active):
   <nav class="sidebar-nav">
     <a href="/" class="%s">Przegląd</a>
     %s
+    <div class="nav-group nav-foot"><a href="/settings" class="%s">Ustawienia</a></div>
   </nav>
-</aside>""" % ("on" if active == "" else "", "".join(sections))
+</aside>""" % ("on" if active == "" else "", "".join(sections),
+               "on" if active == "settings" else "")
 
 
 # Applied before first paint so a dark theme never flashes white on load.
@@ -145,15 +147,18 @@ THEME_BOOT = ("<script>try{var t=localStorage.getItem('work-hub-theme');"
               "if(t&&t!=='auto')document.documentElement.dataset.theme=t;}catch(e){}</script>")
 
 
+CRUMBS = {"": "Przegląd", "settings": "Ustawienia"}
+
+
 def crumb(active):
     panel = sources.BY_ID.get(active)
 
-    return panel.label if panel else "Przegląd"
+    return panel.label if panel else CRUMBS.get(active, "Przegląd")
 
 
 def page(title, active, body, csrf):
     return """<!doctype html>
-<html lang="pl" data-csrf="%s">
+<html lang="pl" data-csrf="%s" data-jira="%s" data-keys="%s">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -182,8 +187,8 @@ def page(title, active, body, csrf):
 <script src="/static/day-rules.js"></script>
 <script src="/static/app.js"></script>
 </body>
-</html>""" % (esc(csrf), esc(title), THEME_BOOT,
-                 sidebar(active), esc(crumb(active)), body)
+</html>""" % (esc(csrf), esc(config.jira_base_url()), esc(",".join(config.project_keys())),
+                 esc(title), THEME_BOOT, sidebar(active), esc(crumb(active)), body)
 
 
 BUCKET_LABELS = {0: "Po terminie", 1: "Nadchodzące", 2: "Bez daty", 3: "Bez wersji"}
@@ -196,6 +201,17 @@ def link(url, text, mono=False):
 
     return '<a href="%s" target="_blank" rel="noopener"%s>%s</a>' % (
         esc(url), ' class="key"' if mono else "", esc(text))
+
+
+def ticket_link(key):
+    """A ticket number, linked when an address is configured and plain text when it is not.
+
+    The address is the hub's own setting: it decides where a key points on screen, not which
+    Jira the skills query — that host lives in redge_work, outside this repository.
+    """
+    base = config.jira_base_url()
+
+    return link("%s/browse/%s" % (base, key) if base else "", key, mono=True)
 
 
 def table(headers, rows):

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Start the work-hub server in the foreground. launchd keeps it alive; see
-# ~/Library/LaunchAgents/work-hub.plist
+# a launchd agent keeps it alive; see the README
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1

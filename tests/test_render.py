@@ -160,3 +160,86 @@ class Notes(unittest.TestCase):
         html = layout.notes({"_notes": {"main": "Pełny skład niedostępny"}})
 
         self.assertIn("Pełny skład niedostępny", html)
+
+
+class Settings(unittest.TestCase):
+    """The settings screen. Its one hard rule: a stored secret never reaches the HTML."""
+
+    def setUp(self):
+        from workhub import config
+
+        self.config = config
+        self.addCleanup(self.clear)
+        self.clear()
+
+    def clear(self):
+        import os
+
+        self.config._cache.update(stamp=None, values={})
+
+        if os.path.exists(self.config.ENV_PATH):
+            os.unlink(self.config.ENV_PATH)
+
+    def html(self):
+        from workhub.render import settings
+
+        return settings.page_body()
+
+    def test_a_stored_token_is_described_never_printed(self):
+        self.config.save({"JIRA_TOKEN": "bardzo-tajne-4f2c"})
+        html = self.html()
+
+        self.assertNotIn("bardzo-tajne", html)
+        self.assertIn("…4f2c", html)
+
+    def test_a_secret_field_comes_up_empty_so_a_save_cannot_echo_it_back(self):
+        self.config.save({"JIRA_TOKEN": "tajne"})
+        html = self.html()
+
+        self.assertIn('type="password"', html)
+        self.assertNotIn('value="tajne"', html)
+
+    def test_every_setting_has_a_field(self):
+        html = self.html()
+
+        for setting in self.config.SETTINGS:
+            self.assertIn('data-setting="%s"' % setting.key, html)
+
+    def test_clearing_is_offered_only_for_a_value_that_exists(self):
+        self.assertIn("disabled", self.html())
+
+        self.config.save({"JIRA_TOKEN": "x"})
+
+        self.assertIn('data-setting-clear="JIRA_TOKEN"', self.html())
+
+    def test_the_shell_renders_for_a_screen_that_is_not_a_panel(self):
+        html = layout.page("t", "settings", "<p>x</p>", "csrf")
+
+        self.assertIn('href="/settings" class="on"', html)
+        self.assertIn("Ustawienia", layout.crumb("settings"))
+
+
+class TicketLinks(unittest.TestCase):
+    def setUp(self):
+        from workhub import config
+
+        self.config = config
+        self.addCleanup(self.clear)
+        self.clear()
+
+    def clear(self):
+        import os
+
+        self.config._cache.update(stamp=None, values={})
+
+        if os.path.exists(self.config.ENV_PATH):
+            os.unlink(self.config.ENV_PATH)
+
+    def test_a_key_links_to_the_configured_jira(self):
+        self.config.save({"JIRA_BASE_URL": "https://jira.example.com/"})
+
+        self.assertIn('href="https://jira.example.com/browse/ABC-1"', layout.ticket_link("ABC-1"))
+
+    def test_without_an_address_the_key_is_plain_text_not_a_broken_link(self):
+        self.assertNotIn("href", layout.ticket_link("ABC-1"))
+        self.assertIn("ABC-1", layout.ticket_link("ABC-1"))

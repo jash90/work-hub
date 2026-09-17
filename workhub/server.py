@@ -13,7 +13,7 @@ import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import DATA_DIR, render, sources, store
+from . import DATA_DIR, config, render, sources, store
 from .runner import Runner
 from .scheduler import Scheduler
 
@@ -85,6 +85,12 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/static/"):
             return self._static(path[len("/static/"):])
 
+        if path == "/settings":
+            return self._send(200, render.settings_page(self.hub))
+
+        if path == "/api/settings":
+            return self._json(200, {"settings": config.describe()})
+
         if path == "/api/state":
             return self._json(200, self._state())
 
@@ -123,6 +129,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/refresh":
             return self._refresh(body)
+
+        if path == "/api/settings":
+            return self._settings_write(body)
 
         if path in ("/api/tempo/log", "/api/tempo/replace", "/api/tempo/undo"):
             return self._tempo_write(body, path.rsplit("/", 1)[1])
@@ -183,6 +192,24 @@ class Handler(BaseHTTPRequestHandler):
     def _run_many(self, targets):
         for panel_id in targets:
             self.hub.runner.run_panel(panel_id)
+
+    def _settings_write(self, body):
+        """Writes `.env` on this machine only — no confirmation, unlike the Jira routes."""
+        values = body.get("values")
+
+        if not isinstance(values, dict):
+            return self._json(400, {"error": "brak ustawień do zapisania"})
+
+        try:
+            saved = config.save(values)
+        except KeyError as exc:
+            return self._json(400, {"error": "nieznane ustawienie: %s" % exc.args[0]})
+        except OSError as exc:
+            return self._json(500, {"error": "nie udało się zapisać .env: %s" % exc})
+
+        written = config.sync_secret_files(saved) if body.get("sync_secrets") is True else []
+
+        return self._json(200, {"ok": True, "saved": sorted(saved), "secret_files": written})
 
     def _tempo_write(self, body, action):
         """The only paths that touch Jira. Never reachable without an explicit confirmation."""

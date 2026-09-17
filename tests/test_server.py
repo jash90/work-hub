@@ -1,5 +1,6 @@
 """The HTTP guards, exercised against a real socket on an ephemeral port."""
 import json
+import os
 import threading
 import unittest
 import urllib.error
@@ -138,3 +139,53 @@ class Guards(unittest.TestCase):
                               {"X-CSRF": self.csrf})
 
         self.assertEqual(400, status)
+
+    # ---------- settings ----------
+
+    def test_the_settings_page_renders(self):
+        status, body = self.call("/settings")
+
+        self.assertEqual(200, status)
+        self.assertIn("Ustawienia", body)
+
+    def test_settings_are_refused_to_a_foreign_host(self):
+        self.assertEqual(403, self.call("/settings", headers={"Host": "evil.example.com"})[0])
+
+    def test_saving_settings_needs_the_csrf_token(self):
+        status, _ = self.call("/api/settings", "POST", {"values": {"TEMPO_USER": "x"}})
+
+        self.assertEqual(403, status)
+
+    def test_an_unknown_setting_is_rejected(self):
+        status, body = self.call("/api/settings", "POST", {"values": {"RM_RF": "nie"}},
+                                 {"X-CSRF": self.csrf})
+
+        self.assertEqual(400, status)
+        self.assertIn("nieznane ustawienie", json.loads(body)["error"])
+
+    def test_a_body_without_settings_is_rejected(self):
+        status, _ = self.call("/api/settings", "POST", {"confirm": True}, {"X-CSRF": self.csrf})
+
+        self.assertEqual(400, status)
+
+    def test_a_saved_secret_is_reported_but_never_returned(self):
+        status, _ = self.call("/api/settings", "POST",
+                              {"values": {"JIRA_TOKEN": "tajne-haslo-9z1q"}},
+                              {"X-CSRF": self.csrf})
+
+        self.assertEqual(200, status)
+
+        body = self.call("/api/settings")[1]
+        item = next(i for i in json.loads(body)["settings"] if i["key"] == "JIRA_TOKEN")
+
+        self.assertNotIn("tajne-haslo", body)
+        self.assertTrue(item["set"])
+        self.assertEqual("…9z1q", item["hint"])
+
+    def test_a_saved_token_does_not_reach_the_secrets_directory_unasked(self):
+        from workhub import config
+
+        self.call("/api/settings", "POST", {"values": {"GITLAB_TOKEN": "bez-synchronizacji"}},
+                  {"X-CSRF": self.csrf})
+
+        self.assertFalse(os.path.exists(os.path.join(config.SECRETS_DIR, "gitlab-token")))

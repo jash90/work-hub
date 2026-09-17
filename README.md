@@ -6,6 +6,12 @@ what to review, where Tempo is short — in a browser instead of a Claude Code s
 
     http://localhost:8787
 
+> **This is not a standalone app.** It is the front-end half of a private toolchain: it runs
+> scripts from `~/.claude/skills` and imports `~/.claude/lib/redge_work`, neither of which is
+> published here. Without them a clone will not start — the import fails before a socket is
+> bound. It is public as a worked example of a stdlib-only local dashboard, not as something
+> to `git clone && run`. See **Dependencies**.
+
 ## How it works
 
 The hub **never reimplements a skill**. Each panel runs that skill's own script with
@@ -26,6 +32,40 @@ An envelope keeps the last good `payload` and the `fetched_at` that dates it. A 
 only updates `attempted_at` and `error`, and the panel shows the older data under a banner.
 The skills behind several panels exit hard when the VPN is down; yesterday's answer is
 worth more than an empty page.
+
+## Configuration
+
+Everything machine-specific lives in a `.env` beside this file. It is in `.gitignore` and is
+written `0600`; `.env.example` lists every key with no values behind it.
+
+    cp .env.example .env      # then fill it in, or use the settings screen
+
+**/settings** edits the same file from the browser. A stored secret is never rendered back —
+a token field always comes up empty and the row reports what is configured through a hint
+(`…3f0a`) plus the source the skills will actually read. Clearing one is explicit, because a
+blank field has to mean "leave it alone" for a form that cannot show what it holds.
+
+| key | what it does |
+|---|---|
+| `JIRA_TOKEN`, `GITLAB_TOKEN`, `CONFLUENCE_TOKEN` | PATs. Confluence has no consumer yet; Jira and Confluence need separate tokens. |
+| `JIRA_BASE_URL` | builds `…/browse/KEY` links **in this UI only** — see below |
+| `JIRA_PROJECT_KEYS` | comma-separated; the first is the placeholder in the Tempo day editor |
+| `TEMPO_USER` | whose worklogs. Tempo has no token of its own — it uses the Jira PAT. |
+| `WORK_HUB_PORT`, `WORK_HUB_PORANEK`, `WORK_HUB_POPOLUDNIE` | read at start-up, so a change needs a restart |
+
+Saved values are laid over `os.environ` in `runner._env()` — the one place every subprocess
+gets its environment, so a token takes effect on the next panel run with no restart and the
+hub never holds a secret in memory. `os.environ` itself is not touched.
+
+**Two limits worth knowing before you go looking for a bug:**
+
+- `JIRA_BASE_URL` decides where a ticket number points **on screen**. It does not decide which
+  Jira the skills query — that host is hardcoded in `redge_work`, outside this repository.
+- `redge_work.auth` resolves a token **Keychain → environment → file**, so a Keychain entry
+  silently outranks anything saved here. The settings screen says so when it finds one.
+- `tempo-fill` reads the Jira token *only* from `~/.claude/.secrets/jira-token` and never looks
+  at the environment. The "zapisz też do ~/.claude/.secrets" checkbox mirrors it there;
+  without it, a token saved here works everywhere except writing worklogs.
 
 ## Schedule
 
@@ -100,7 +140,7 @@ launchd keeps it alive and starts it at login:
 
     launchctl load   ~/Library/LaunchAgents/work-hub.plist
     launchctl unload ~/Library/LaunchAgents/work-hub.plist
-    launchctl kickstart -k gui/$UID/work-hub      # restart
+    launchctl kickstart -k gui/$UID/work-hub                # restart
 
 Logs: `~/.work-hub.log` (starts), `~/.work-hub.err` (crashes). By hand: `bin/work-hub`.
 
@@ -114,7 +154,9 @@ Single-user, loopback only, and it has a write path — so:
 
 - binds only the loopback addresses, never `0.0.0.0`;
 - refuses any request whose `Host` is not localhost (DNS rebinding);
-- a CSRF token minted at start-up, required on every `POST`.
+- a CSRF token minted at start-up, required on every `POST`;
+- `.env` is `0600` and git-ignored, and no route ever returns a stored secret — `/api/settings`
+  reports a four-character tail and which source wins, nothing more.
 
 `http.server` is not a public web server and is not used as one.
 
@@ -181,13 +223,11 @@ without ever running it. The day-rule tests shell out to Node and skip when it i
 
 ## Dependencies
 
-None. Standard library on `/usr/bin/python3` (3.9), plus `~/.claude/lib/redge_work` for
-atomic cache writes and Polish plurals — the same library the skills use. `glab` must be on
+No third-party packages: standard library on `/usr/bin/python3` (3.9).
+
+It is **not self-contained**, though. `~/.claude/lib/redge_work` (atomic cache writes, Polish
+plurals, the token resolver) is imported by eight modules at load time, and the panels shell
+out to nine scripts under `~/.claude/skills`. Neither is published here, so a clone of this
+repository alone will raise `ImportError` before the server starts. `glab` must also be on
 PATH for `review-queue` and `protokol`.
 
-## Known issue outside the hub
-
-`release-dashboard --json` fails with **HTTP 400** from Jira on its team-roster query (the
-`fixVersion in (…) AND assignee != currentUser()` phase) — a pre-existing bug in that skill,
-reproducible straight from the terminal. The panel falls back to `--mine-only` and says so
-in a banner, so it shows my own tasks rather than nothing.

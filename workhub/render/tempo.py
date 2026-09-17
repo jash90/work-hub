@@ -12,7 +12,8 @@ import datetime
 
 from redge_work.polish import plural
 
-from .layout import chip, empty, esc, link, section, table
+from .. import config
+from .layout import chip, empty, esc, section, table, ticket_link
 
 QUARTER = 0.25
 TARGET_HOURS = 8.0
@@ -28,6 +29,13 @@ ENDPOINTS = {"propose": "/api/tempo/log", "logged": "/api/tempo/replace"}
 
 def _hours(value):
     return ("%g" % round(value, 2))
+
+
+def _key_hint():
+    """The placeholder for a ticket typed by hand — the first project the hub is set up for."""
+    keys = config.project_keys()
+
+    return keys[0] if keys else "ABC"
 
 
 def _date(iso):
@@ -57,7 +65,7 @@ def _entry_row(entry):
   </td>
 </tr>""" % (
         ' data-worklog-id="%s"' % esc(str(entry["id"])) if entry.get("id") else "",
-        link("https://jira.example.com/browse/%s" % entry["key"], entry["key"], mono=True),
+        ticket_link(entry["key"]),
         esc(subjects),
         '<span class="summary">%s</span>' % esc((entry.get("summary") or "")[:90]),
         '<span class="muted">%s</span>' % esc(plural(commits, "commit", "commity", "commitów"))
@@ -99,7 +107,7 @@ def _day(day, mode):
   </header>
   <table class="entries-table"><tbody>%s</tbody></table>
   <div class="add-entry">
-    <input class="add-key" placeholder="ABC-1234" aria-label="klucz ticketu"
+    <input class="add-key" placeholder="%s-1234" aria-label="klucz ticketu"
            pattern="[A-Za-z][A-Za-z0-9]*-[0-9]+">
     <div class="stepper">
       <button type="button" class="step" data-step="-0.25" aria-label="mniej o 15 minut">−</button>
@@ -118,6 +126,7 @@ def _day(day, mode):
         "Zapisz zmiany" if mode == "logged" else "Zaloguj dzień",
         trailing,
         "".join(_entry_row(e) for e in entries),
+        esc(_key_hint()),
     )
 
 

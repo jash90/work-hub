@@ -6,7 +6,7 @@ not have.
 """
 from redge_work.polish import plural
 
-from .layout import chip, copy_button, empty, esc, link, section, table
+from .layout import chip, copy_button, empty, esc, section, table, ticket_link
 
 COMMITS_BRIEF = """Odpal skill daily-commit-summary i zbuduj z poniższych danych raport HTML
 (pole `plain` po ludzku, 2-3 zdania). Dane są już zebrane, nie zbieraj ich ponownie.
@@ -54,7 +54,7 @@ def protokol_body(payload):
 
     for item in items:
         rows.append([
-            link("https://jira.example.com/browse/%s" % item["ticket"], item["ticket"], mono=True),
+            ticket_link(item["ticket"]),
             esc(item.get("product") or "—"),
             '<span class="muted">%s</span>' % esc(", ".join(item.get("platforms") or [])),
             '<span class="summary">%s</span>' % esc(item.get("jira_summary")),
