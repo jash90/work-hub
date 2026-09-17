@@ -4,9 +4,8 @@ import html
 import re
 import time
 
-from redge_work.polish import days_phrase, plural
-
 from .. import config, sources
+from ..text import count, days
 
 
 def esc(value):
@@ -18,28 +17,26 @@ def chip(text, tone=""):
 
 
 def ago(seconds):
-    """Relative age in Polish, at the coarsest unit that still says something useful."""
+    """Relative age at the coarsest unit that still says something useful."""
     if seconds is None:
-        return "nigdy"
+        return "never"
 
     delta = max(0, int(time.time() - seconds))
 
     if delta < 90:
-        return "przed chwilą"
+        return "just now"
 
     minutes = delta // 60
 
     if minutes < 60:
-        return "%s temu" % plural(minutes, "minutę", "minuty", "minut")
+        return "%s ago" % count(minutes, "minute")
 
     hours = minutes // 60
 
     if hours < 24:
-        return "%s temu" % plural(hours, "godzinę", "godziny", "godzin")
+        return "%s ago" % count(hours, "hour")
 
-    days = hours // 24
-
-    return "%s temu" % days_phrase(days)
+    return "%s ago" % days(hours // 24)
 
 
 def clock(seconds):
@@ -58,7 +55,7 @@ def clock(seconds):
 def freshness(envelope):
     """One line telling the truth about the data on screen."""
     if not envelope or envelope.get("payload") is None:
-        return '<time class="stamp">brak danych</time>'
+        return '<time class="stamp">no data</time>'
 
     return '<time class="stamp" title="%s">%s (%s)</time>' % (
         esc(clock(envelope.get("fetched_at"))), esc(clock(envelope.get("fetched_at"))),
@@ -68,7 +65,7 @@ def freshness(envelope):
 def banner(envelope):
     """A failed refresh must say so, without hiding the older data it left standing."""
     if not envelope:
-        return '<div class="banner info">Panel nie był jeszcze odświeżany.</div>'
+        return '<div class="banner info">This panel has not been refreshed yet.</div>'
 
     error = envelope.get("error")
 
@@ -76,10 +73,10 @@ def banner(envelope):
         return ""
 
     if envelope.get("payload") is None:
-        return ('<div class="banner bad"><strong>Nie udało się pobrać danych.</strong> %s</div>'
+        return ('<div class="banner bad"><strong>Could not fetch the data.</strong> %s</div>'
                 % esc(tidy_error(error)))
 
-    return ('<div class="banner warn"><strong>Dane z %s</strong> — ostatnia próba (%s) nie powiodła się: %s</div>'
+    return ('<div class="banner warn"><strong>Data from %s</strong> — the last attempt (%s) failed: %s</div>'
             % (esc(clock(envelope.get("fetched_at"))), esc(clock(envelope.get("attempted_at"))),
                esc(tidy_error(error))))
 
@@ -129,14 +126,14 @@ def sidebar(active):
                         % (esc(sources.GROUP_LABELS[group]), links))
 
     return """<div class="scrim" data-nav-close hidden></div>
-<aside class="sidebar" id="sidebar" aria-label="Nawigacja">
+<aside class="sidebar" id="sidebar" aria-label="Navigation">
   <div class="sidebar-head">
     <a class="brand" href="/"><span class="dot"></span>work-hub</a>
   </div>
   <nav class="sidebar-nav">
-    <a href="/" class="%s">Przegląd</a>
+    <a href="/" class="%s">Overview</a>
     %s
-    <div class="nav-group nav-foot"><a href="/settings" class="%s">Ustawienia</a></div>
+    <div class="nav-group nav-foot"><a href="/settings" class="%s">Settings</a></div>
   </nav>
 </aside>""" % ("on" if active == "" else "", "".join(sections),
                "on" if active == "settings" else "")
@@ -147,18 +144,18 @@ THEME_BOOT = ("<script>try{var t=localStorage.getItem('work-hub-theme');"
               "if(t&&t!=='auto')document.documentElement.dataset.theme=t;}catch(e){}</script>")
 
 
-CRUMBS = {"": "Przegląd", "settings": "Ustawienia"}
+CRUMBS = {"": "Overview", "settings": "Settings"}
 
 
 def crumb(active):
     panel = sources.BY_ID.get(active)
 
-    return panel.label if panel else CRUMBS.get(active, "Przegląd")
+    return panel.label if panel else CRUMBS.get(active, "Overview")
 
 
 def page(title, active, body, csrf):
     return """<!doctype html>
-<html lang="pl" data-csrf="%s" data-jira="%s" data-keys="%s">
+<html lang="en" data-csrf="%s" data-jira="%s" data-keys="%s">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -171,12 +168,12 @@ def page(title, active, body, csrf):
 <div class="content">
   <header class="topbar">
     <div class="topbar-inner">
-      <button class="ghost icon nav-toggle" data-nav-open aria-label="Otwórz nawigację"
+      <button class="ghost icon nav-toggle" data-nav-open aria-label="Open navigation"
               aria-controls="sidebar" aria-expanded="false">☰</button>
       <h2 class="crumb">%s</h2>
       <span class="spacer"></span>
-      <button class="ghost icon" data-theme-toggle title="Motyw: automatyczny" aria-label="Zmień motyw">◐</button>
-      <button class="primary" data-refresh-all>Odśwież wszystko</button>
+      <button class="ghost icon" data-theme-toggle title="Theme: automatic" aria-label="Change theme">◐</button>
+      <button class="primary" data-refresh-all>Refresh all</button>
     </div>
   </header>
   <div class="page">
@@ -191,7 +188,7 @@ def page(title, active, body, csrf):
                  esc(title), THEME_BOOT, sidebar(active), esc(crumb(active)), body)
 
 
-BUCKET_LABELS = {0: "Po terminie", 1: "Nadchodzące", 2: "Bez daty", 3: "Bez wersji"}
+BUCKET_LABELS = {0: "Overdue", 1: "Upcoming", 2: "No date", 3: "No version"}
 BUCKET_TONES = {0: "bad", 1: "accent", 2: "", 3: ""}
 
 
@@ -228,24 +225,24 @@ def table(headers, rows):
 
 
 def when(row):
-    """„Apple_Android TV 12.0.0 · jutro" — the release a task is aimed at."""
+    """"Apple_Android TV 12.0.0 · tomorrow" — the release a task is aimed at."""
     name = row.get("release_name")
 
     if not name:
         return '<span class="muted">—</span>'
 
-    days = row.get("days")
+    left = row.get("days")
     parts = [esc(name)]
 
-    if days is not None:
-        if days < 0:
-            parts.append('<span class="chip bad">%s po terminie</span>' % days_phrase(abs(days)))
-        elif days == 0:
-            parts.append('<span class="chip wait">dziś</span>')
-        elif days == 1:
-            parts.append('<span class="chip wait">jutro</span>')
+    if left is not None:
+        if left < 0:
+            parts.append('<span class="chip bad">%s overdue</span>' % days(abs(left)))
+        elif left == 0:
+            parts.append('<span class="chip wait">today</span>')
+        elif left == 1:
+            parts.append('<span class="chip wait">tomorrow</span>')
         else:
-            parts.append('<span class="chip">za %s</span>' % days_phrase(days))
+            parts.append('<span class="chip">in %s</span>' % days(left))
 
     return " ".join(parts)
 
@@ -263,7 +260,7 @@ def mr_links(mrs):
             tone = "ok" if mr["approvals"] >= 2 else ""
 
         if mr.get("unresolved"):
-            detail.append("%d nierozwiązane" % mr["unresolved"])
+            detail.append(count(mr["unresolved"], "unresolved thread"))
             tone = "wait"
 
         hint = " · ".join([x for x in (mr.get("repo"), mr.get("title")) if x] + detail)

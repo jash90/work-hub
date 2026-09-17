@@ -7,8 +7,8 @@ const QUARTER = 0.25;
 const round15 = (value) => Math.max(0, Math.round(value / QUARTER) * QUARTER);
 const fmt = (value) => String(Number(value.toFixed(2)));
 
-// Hour fields are text, not number, so a Polish decimal comma is read rather than silently
-// dropped — Chrome renders a number input per locale but reports "" for anything it dislikes.
+// Hour fields are text, not number, so a decimal comma is read rather than silently dropped —
+// Chrome renders a number input per locale but reports "" for anything it dislikes.
 function parseHours(raw) {
   const text = String(raw == null ? '' : raw).trim().replace(',', '.');
 
@@ -28,31 +28,26 @@ function dayVerdict(hours, target, partial, overtime) {
 
   let problem = '';
 
-  if (broken) problem = 'godziny muszą być liczbą, np. 1,75';
-  else if (!counted.length) problem = 'dodaj przynajmniej jedną pozycję';
-  else if (offGrid) problem = 'godziny muszą być wielokrotnością 15 minut';
-  else if (total < target && !partial) problem = `brakuje ${fmt(target - total)} h do ${fmt(target)} h`;
-  else if (total > target && !overtime) problem = `${fmt(total - target)} h ponad ${fmt(target)} h — zaznacz „nadgodziny”`;
+  if (broken) problem = 'hours must be a number, e.g. 1.75';
+  else if (!counted.length) problem = 'add at least one entry';
+  else if (offGrid) problem = 'hours must be a multiple of 15 minutes';
+  else if (total < target && !partial) problem = `${fmt(target - total)} h short of ${fmt(target)} h`;
+  else if (total > target && !overtime) problem = `${fmt(total - target)} h over ${fmt(target)} h — tick "overtime"`;
 
-  let note = 'gotowe do zapisu';
+  let note = 'ready to write';
 
   if (problem) note = problem;
-  else if (total < target) note = `niepełny dzień: ${fmt(total)} h`;
-  else if (total > target) note = `nadgodziny: ${fmt(total)} h`;
+  else if (total < target) note = `short day: ${fmt(total)} h`;
+  else if (total > target) note = `overtime: ${fmt(total)} h`;
 
   return { total, problem, note, ok: !problem };
 }
 
-// Mirrors redge_work.polish.plural — the same rule, on the other side of the wire.
-function plural(n, one, few, many) {
-  if (n === 1) return `${n} ${one}`;
-
-  const teens = n % 100;
-  const last = n % 10;
-
-  return `${n} ${last >= 2 && last <= 4 && !(teens >= 12 && teens <= 14) ? few : many}`;
+// Mirrors workhub.text.count — the same rule, on the other side of the wire.
+function count(n, one, many) {
+  return `${n} ${n === 1 ? one : (many || `${one}s`)}`;
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { QUARTER, round15, fmt, parseHours, dayVerdict, plural };
+  module.exports = { QUARTER, round15, fmt, parseHours, dayVerdict, count };
 }

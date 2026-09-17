@@ -47,7 +47,7 @@ class Guards(unittest.TestCase):
 
     def test_post_with_wrong_token_is_refused(self):
         status, _ = self.call("/api/refresh", "POST", {"panel": "testing"},
-                              {"X-CSRF": "nie-ten"})
+                              {"X-CSRF": "wrong-one"})
 
         self.assertEqual(403, status)
 
@@ -71,7 +71,7 @@ class Guards(unittest.TestCase):
                                  {"X-CSRF": self.csrf})
 
         self.assertEqual(400, status)
-        self.assertIn("potwierdzenia", body)
+        self.assertIn("confirmation", body)
 
     def test_tempo_log_validates_the_day(self):
         status, body = self.call("/api/tempo/log", "POST",
@@ -87,7 +87,7 @@ class Guards(unittest.TestCase):
                                  {"X-CSRF": self.csrf})
 
         self.assertEqual(400, status)
-        self.assertIn("potwierdzenia", body)
+        self.assertIn("confirmation", body)
 
         status, body = self.call("/api/tempo/replace", "POST",
                                  {"day": "wczoraj", "confirm": True}, {"X-CSRF": self.csrf})
@@ -135,7 +135,7 @@ class Guards(unittest.TestCase):
         self.assertEqual(404, self.call("/api/nie-ma")[0])
 
     def test_refresh_of_unknown_panel_is_rejected(self):
-        status, _ = self.call("/api/refresh", "POST", {"panel": "nie-ma"},
+        status, _ = self.call("/api/refresh", "POST", {"panel": "no-such-thing"},
                               {"X-CSRF": self.csrf})
 
         self.assertEqual(400, status)
@@ -146,7 +146,7 @@ class Guards(unittest.TestCase):
         status, body = self.call("/settings")
 
         self.assertEqual(200, status)
-        self.assertIn("Ustawienia", body)
+        self.assertIn("Settings", body)
 
     def test_settings_are_refused_to_a_foreign_host(self):
         self.assertEqual(403, self.call("/settings", headers={"Host": "evil.example.com"})[0])
@@ -161,7 +161,7 @@ class Guards(unittest.TestCase):
                                  {"X-CSRF": self.csrf})
 
         self.assertEqual(400, status)
-        self.assertIn("nieznane ustawienie", json.loads(body)["error"])
+        self.assertIn("unknown setting", json.loads(body)["error"])
 
     def test_a_body_without_settings_is_rejected(self):
         status, _ = self.call("/api/settings", "POST", {"confirm": True}, {"X-CSRF": self.csrf})
@@ -170,7 +170,7 @@ class Guards(unittest.TestCase):
 
     def test_a_saved_secret_is_reported_but_never_returned(self):
         status, _ = self.call("/api/settings", "POST",
-                              {"values": {"JIRA_TOKEN": "tajne-haslo-9z1q"}},
+                              {"values": {"JIRA_TOKEN": "secret-password-9z1q"}},
                               {"X-CSRF": self.csrf})
 
         self.assertEqual(200, status)
@@ -178,14 +178,14 @@ class Guards(unittest.TestCase):
         body = self.call("/api/settings")[1]
         item = next(i for i in json.loads(body)["settings"] if i["key"] == "JIRA_TOKEN")
 
-        self.assertNotIn("tajne-haslo", body)
+        self.assertNotIn("secret-password", body)
         self.assertTrue(item["set"])
         self.assertEqual("…9z1q", item["hint"])
 
     def test_a_saved_token_does_not_reach_the_secrets_directory_unasked(self):
         from workhub import config
 
-        self.call("/api/settings", "POST", {"values": {"GITLAB_TOKEN": "bez-synchronizacji"}},
+        self.call("/api/settings", "POST", {"values": {"GITLAB_TOKEN": "not-mirrored"}},
                   {"X-CSRF": self.csrf})
 
         self.assertFalse(os.path.exists(os.path.join(config.SECRETS_DIR,

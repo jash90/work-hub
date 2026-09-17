@@ -27,7 +27,7 @@ class EnvFile(unittest.TestCase):
         self.assertEqual({}, config.load())
 
     def test_comments_and_blank_lines_are_skipped(self):
-        self.write("# komentarz\n\nJIRA_TOKEN=abc\n")
+        self.write("# a comment\n\nJIRA_TOKEN=abc\n")
 
         self.assertEqual({"JIRA_TOKEN": "abc"}, config.load())
 
@@ -39,38 +39,38 @@ class EnvFile(unittest.TestCase):
         self.assertEqual("a=b=c", values["GITLAB_TOKEN"])
 
     def test_a_saved_file_reads_back(self):
-        config.save({"JIRA_TOKEN": "sekret", "TEMPO_USER": "imie.nazwisko"})
+        config.save({"JIRA_TOKEN": "a-secret", "TEMPO_USER": "first.last"})
 
-        self.assertEqual("sekret", config.load()["JIRA_TOKEN"])
-        self.assertEqual("imie.nazwisko", config.load()["TEMPO_USER"])
+        self.assertEqual("a-secret", config.load()["JIRA_TOKEN"])
+        self.assertEqual("first.last", config.load()["TEMPO_USER"])
 
     def test_the_file_is_not_readable_by_anyone_else(self):
-        config.save({"JIRA_TOKEN": "sekret"})
+        config.save({"JIRA_TOKEN": "a-secret"})
 
         self.assertEqual(0o600, os.stat(config.ENV_PATH).st_mode & 0o777)
 
     def test_an_unknown_key_is_refused_rather_than_stored(self):
         with self.assertRaises(KeyError):
-            config.save({"RM_RF": "nie"})
+            config.save({"RM_RF": "no"})
 
     def test_an_absent_key_keeps_its_value_but_an_empty_one_clears_it(self):
         """The form cannot show a stored token, so silence must not mean deletion."""
-        config.save({"JIRA_TOKEN": "sekret", "GITLAB_TOKEN": "drugi"})
-        config.save({"TEMPO_USER": "ktos"})
+        config.save({"JIRA_TOKEN": "a-secret", "GITLAB_TOKEN": "second"})
+        config.save({"TEMPO_USER": "someone"})
 
-        self.assertEqual("sekret", config.load()["JIRA_TOKEN"])
+        self.assertEqual("a-secret", config.load()["JIRA_TOKEN"])
 
         config.save({"JIRA_TOKEN": ""})
 
         self.assertNotIn("JIRA_TOKEN", config.load())
-        self.assertEqual("drugi", config.load()["GITLAB_TOKEN"])
+        self.assertEqual("second", config.load()["GITLAB_TOKEN"])
 
     def test_a_rewritten_file_is_read_again(self):
-        self.write("TEMPO_USER=pierwszy\n")
-        self.assertEqual("pierwszy", config.load()["TEMPO_USER"])
+        self.write("TEMPO_USER=first\n")
+        self.assertEqual("first", config.load()["TEMPO_USER"])
 
-        self.write("TEMPO_USER=drugi\n")
-        self.assertEqual("drugi", config.load()["TEMPO_USER"])
+        self.write("TEMPO_USER=second\n")
+        self.assertEqual("second", config.load()["TEMPO_USER"])
 
 
 class Describe(unittest.TestCase):
@@ -88,10 +88,10 @@ class Describe(unittest.TestCase):
         return next(i for i in config.describe() if i["key"] == key)
 
     def test_a_secret_is_never_handed_back(self):
-        config.save({"JIRA_TOKEN": "bardzo-tajny-token-3f0a"})
+        config.save({"JIRA_TOKEN": "very-secret-token-3f0a"})
         item = self.item("JIRA_TOKEN")
 
-        self.assertNotIn("bardzo-tajny-token", repr(config.describe()))
+        self.assertNotIn("very-secret-token", repr(config.describe()))
         self.assertEqual("…3f0a", item["hint"])
         self.assertTrue(item["set"])
 
@@ -101,9 +101,9 @@ class Describe(unittest.TestCase):
         self.assertEqual("…", self.item("JIRA_TOKEN")["hint"])
 
     def test_a_plain_setting_is_shown_because_it_is_not_a_secret(self):
-        config.save({"TEMPO_USER": "imie.nazwisko"})
+        config.save({"TEMPO_USER": "first.last"})
 
-        self.assertEqual("imie.nazwisko", self.item("TEMPO_USER")["hint"])
+        self.assertEqual("first.last", self.item("TEMPO_USER")["hint"])
 
     def test_an_unset_setting_reports_no_source(self):
         self.assertEqual("", self.item("CONFLUENCE_TOKEN")["source"])
@@ -123,7 +123,7 @@ class Describe(unittest.TestCase):
 
         self.addCleanup(os.unlink, path)
 
-        self.assertEqual("plik", self.item("CONFLUENCE_TOKEN")["source"])
+        self.assertEqual("file", self.item("CONFLUENCE_TOKEN")["source"])
         self.assertFalse(self.item("CONFLUENCE_TOKEN")["set"])
 
 
@@ -131,12 +131,12 @@ class SecretFiles(unittest.TestCase):
     """tempo-fill reads a file and ignores the environment, so a token must land there too."""
 
     def test_a_token_is_mirrored_with_no_access_for_anyone_else(self):
-        written = config.sync_secret_files({"JIRA_TOKEN": "sekret"})
+        written = config.sync_secret_files({"JIRA_TOKEN": "a-secret"})
         path = os.path.join(config.SECRETS_DIR, "jira-token")
         self.addCleanup(os.unlink, path)
 
         with open(path) as handle:
-            self.assertEqual("sekret", handle.read().strip())
+            self.assertEqual("a-secret", handle.read().strip())
 
         self.assertIn("jira-token", written)
         self.assertEqual(0o600, os.stat(path).st_mode & 0o777)
@@ -161,14 +161,14 @@ class SubprocessEnvironment(unittest.TestCase):
             os.unlink(config.ENV_PATH)
 
     def test_the_env_file_covers_the_process_environment(self):
-        os.environ["GITLAB_TOKEN"] = "ze-srodowiska"
+        os.environ["GITLAB_TOKEN"] = "from-the-environment"
         self.addCleanup(os.environ.pop, "GITLAB_TOKEN", None)
-        config.save({"GITLAB_TOKEN": "z-pliku"})
+        config.save({"GITLAB_TOKEN": "from-the-file"})
 
-        self.assertEqual("z-pliku", runner._env()["GITLAB_TOKEN"])
+        self.assertEqual("from-the-file", runner._env()["GITLAB_TOKEN"])
 
     def test_the_process_environment_is_never_mutated(self):
-        config.save({"TEMPO_USER": "ktos"})
+        config.save({"TEMPO_USER": "someone"})
         runner._env()
 
         self.assertIsNone(os.environ.get("TEMPO_USER"))

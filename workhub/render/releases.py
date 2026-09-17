@@ -1,8 +1,7 @@
 """The release board: every fixVersion carrying one of my tasks."""
 from collections import defaultdict
 
-from redge_work.polish import plural
-
+from ..text import count
 from .layout import chip, empty, esc, notes, section, table, ticket_link
 
 PROGRESS_TONES = {"review": "accent", "qa": "wait", "done": "ok", "mine": ""}
@@ -16,7 +15,7 @@ def _mr_marks(mrs):
         label = "!%s (%d approve" % (mr.get("iid"), mr.get("approval_count", 0))
 
         if mr.get("unresolved"):
-            label += ", %d nierozwiązane" % mr["unresolved"]
+            label += ", %s" % count(mr["unresolved"], "unresolved thread")
 
         marks.append('<a href="%s" target="_blank" rel="noopener">%s</a>'
                      % (esc(mr.get("web_url")), chip(label + ")", tone)))
@@ -31,7 +30,7 @@ def body(payload):
     groups = defaultdict(list)
 
     for issue in issues:
-        groups[(issue.get("release_date") or "9999", issue.get("release_name") or "Bez wersji")].append(issue)
+        groups[(issue.get("release_date") or "9999", issue.get("release_name") or "No version")].append(issue)
 
     blocks = [notes(payload)]
 
@@ -48,9 +47,9 @@ def body(payload):
             ])
 
         when = "" if date == "9999" else " · %s" % date
-        note = chip("%s" % plural(len(items), "task", "taski", "tasków"))
+        note = chip(count(len(items), "task"))
         blocks.append(section("%s%s" % (name, when),
-                              table(["Ticket", "Status", "Przypisany", "Temat", "MR"], rows), note))
+                              table(["Ticket", "Status", "Assignee", "Summary", "MR"], rows), note))
 
     history = data.get("history") or []
 
@@ -59,10 +58,10 @@ def body(payload):
                  ticket_link(h["key"]),
                  '<span class="muted">%s → </span>%s' % (esc(h.get("from")), chip(h.get("to") or ""))]
                 for h in history[:25]]
-        blocks.append(section("Zmiany statusów", table(["Kiedy", "Ticket", "Przejście"], rows),
+        blocks.append(section("Status changes", table(["When", "Ticket", "Transition"], rows),
                               chip(str(len(history)))))
 
-    return "".join(blocks) or empty("Brak tasków w wydaniach.")
+    return "".join(blocks) or empty("No tasks in any release.")
 
 
 def headline(payload):
@@ -70,5 +69,5 @@ def headline(payload):
     issues = data.get("issues") or []
     releases = {i.get("release_name") for i in issues if i.get("release_name")}
 
-    return " ".join([chip(plural(len(releases), "wydanie", "wydania", "wydań")),
-                     chip(plural(len(issues), "task", "taski", "tasków"))])
+    return " ".join([chip(count(len(releases), "release")),
+                     chip(count(len(issues), "task"))])

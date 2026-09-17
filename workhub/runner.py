@@ -52,13 +52,13 @@ def run_command(command, timeout, env=None):
         proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
                               env=env if env is not None else _env())
     except subprocess.TimeoutExpired:
-        raise CommandFailed("przekroczony czas %ds (%s)" % (timeout, command.name))
+        raise CommandFailed("timed out after %ds (%s)" % (timeout, command.name))
     except OSError as exc:
-        raise CommandFailed("nie udało się uruchomić %s: %s" % (command.name, exc))
+        raise CommandFailed("could not run %s: %s" % (command.name, exc))
 
     if proc.returncode != 0:
-        detail = _tail(proc.stderr) or _tail(proc.stdout) or "brak komunikatu"
-        raise CommandFailed("%s zakończone kodem %d: %s" % (command.name, proc.returncode, detail))
+        detail = _tail(proc.stderr) or _tail(proc.stdout) or "no message"
+        raise CommandFailed("%s exited with code %d: %s" % (command.name, proc.returncode, detail))
 
     if command.parse == sources.TEXT:
         return proc.stdout
@@ -66,7 +66,7 @@ def run_command(command, timeout, env=None):
     try:
         return json.loads(proc.stdout)
     except ValueError:
-        raise CommandFailed("%s nie zwróciło JSON-a: %s" % (command.name, _tail(proc.stdout)[:200]))
+        raise CommandFailed("%s returned no JSON: %s" % (command.name, _tail(proc.stdout)[:200]))
 
 
 class Runner:

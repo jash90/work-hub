@@ -10,19 +10,18 @@ total, a worklog id that is really there) remain the skill's.
 """
 import datetime
 
-from redge_work.polish import plural
-
 from .. import config
+from ..text import count
 from .layout import chip, empty, esc, section, table, ticket_link
 
 QUARTER = 0.25
 TARGET_HOURS = 8.0
 
-WEEKDAYS = {"Mon": "poniedziałek", "Tue": "wtorek", "Wed": "środa", "Thu": "czwartek",
-            "Fri": "piątek", "Sat": "sobota", "Sun": "niedziela"}
+WEEKDAYS = {"Mon": "Monday", "Tue": "Tuesday", "Wed": "Wednesday", "Thu": "Thursday",
+            "Fri": "Friday", "Sat": "Saturday", "Sun": "Sunday"}
 
-MONTHS = ("stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca",
-          "sierpnia", "września", "października", "listopada", "grudnia")
+MONTHS = ("January", "February", "March", "April", "May", "June", "July",
+          "August", "September", "October", "November", "December")
 
 ENDPOINTS = {"propose": "/api/tempo/log", "logged": "/api/tempo/replace"}
 
@@ -41,7 +40,7 @@ def _key_hint():
 def _date(iso):
     day = datetime.date.fromisoformat(iso)
 
-    return "%d %s" % (day.day, MONTHS[day.month - 1])
+    return "%s %d" % (MONTHS[day.month - 1], day.day)
 
 
 def _entry_row(entry):
@@ -54,21 +53,21 @@ def _entry_row(entry):
   <td class="entry-commits">%s</td>
   <td class="entry-hours">
     <div class="stepper">
-      <button type="button" class="step" data-step="-0.25" aria-label="mniej o 15 minut">−</button>
+      <button type="button" class="step" data-step="-0.25" aria-label="15 minutes less">−</button>
       <input type="text" class="hours" value="%s" inputmode="decimal"
-             autocomplete="off" aria-label="godziny dla %s">
-      <button type="button" class="step" data-step="0.25" aria-label="więcej o 15 minut">+</button>
+             autocomplete="off" aria-label="hours for %s">
+      <button type="button" class="step" data-step="0.25" aria-label="15 minutes more">+</button>
     </div>
   </td>
   <td class="entry-drop">
-    <button type="button" class="ghost" data-drop aria-label="usuń pozycję">×</button>
+    <button type="button" class="ghost" data-drop aria-label="remove entry">×</button>
   </td>
 </tr>""" % (
         ' data-worklog-id="%s"' % esc(str(entry["id"])) if entry.get("id") else "",
         ticket_link(entry["key"]),
         esc(subjects),
         '<span class="summary">%s</span>' % esc((entry.get("summary") or "")[:90]),
-        '<span class="muted">%s</span>' % esc(plural(commits, "commit", "commity", "commitów"))
+        '<span class="muted">%s</span>' % esc(count(commits, "commit"))
         if commits is not None else "",
         esc(_hours(entry.get("hours", 0))),
         esc(entry["key"]),
@@ -82,9 +81,9 @@ def _day(day, mode):
     # A day Tempo already holds is cleared by writing an empty split; a day that is only a
     # proposal has nothing to clear yet, but a write made a moment ago can still be taken back.
     if entries and mode == "logged":
-        trailing = '<button class="danger" data-tempo-clear>Wyczyść dzień</button>'
+        trailing = '<button class="danger" data-tempo-clear>Clear the day</button>'
     elif mode == "propose":
-        trailing = '<button class="danger" data-tempo-undo="%s">Cofnij</button>' % esc(day["day"])
+        trailing = '<button class="danger" data-tempo-undo="%s">Undo</button>' % esc(day["day"])
     else:
         trailing = ""
 
@@ -96,26 +95,26 @@ def _day(day, mode):
     </div>
     <span class="chip" data-total>%s h</span>
     <span class="spacer"></span>
-    <label class="switch" title="Pozwól zapisać dzień krótszy niż 8 h">
-      <input type="checkbox" data-partial> niepełny dzień
+    <label class="switch" title="Allow a day shorter than 8 h to be written">
+      <input type="checkbox" data-partial> short day
     </label>
-    <label class="switch" title="Pozwól zapisać dzień dłuższy niż 8 h">
-      <input type="checkbox" data-overtime> nadgodziny
+    <label class="switch" title="Allow a day longer than 8 h to be written">
+      <input type="checkbox" data-overtime> overtime
     </label>
     <button class="primary" data-tempo-log="%s">%s</button>
     %s
   </header>
   <table class="entries-table"><tbody>%s</tbody></table>
   <div class="add-entry">
-    <input class="add-key" placeholder="%s-1234" aria-label="klucz ticketu"
+    <input class="add-key" placeholder="%s-1234" aria-label="ticket key"
            pattern="[A-Za-z][A-Za-z0-9]*-[0-9]+">
     <div class="stepper">
-      <button type="button" class="step" data-step="-0.25" aria-label="mniej o 15 minut">−</button>
+      <button type="button" class="step" data-step="-0.25" aria-label="15 minutes less">−</button>
       <input type="text" class="hours add-hours" value="1" inputmode="decimal"
-             autocomplete="off" aria-label="godziny nowej pozycji">
-      <button type="button" class="step" data-step="0.25" aria-label="więcej o 15 minut">+</button>
+             autocomplete="off" aria-label="hours for the new entry">
+      <button type="button" class="step" data-step="0.25" aria-label="15 minutes more">+</button>
     </div>
-    <button type="button" data-add>Dodaj pozycję</button>
+    <button type="button" data-add>Add entry</button>
     <span class="spacer"></span>
     <span class="muted hint" data-hint></span>
   </div>
@@ -123,7 +122,7 @@ def _day(day, mode):
         esc(day["day"]), TARGET_HOURS, ENDPOINTS[mode],
         esc(_date(day["day"])), esc(weekday), esc(day["day"]),
         esc(_hours(day.get("total_hours", 0))), esc(day["day"]),
-        "Zapisz zmiany" if mode == "logged" else "Zaloguj dzień",
+        "Save changes" if mode == "logged" else "Log the day",
         trailing,
         "".join(_entry_row(e) for e in entries),
         esc(_key_hint()),
@@ -146,8 +145,8 @@ def _rest_day(day):
   </header>%s
 </article>""" % (
         esc(_date(day["day"])), esc(weekday),
-        "%s h — dzień wolny, edytuj w Tempo" % esc(_hours(day.get("total_hours", 0)))
-        if entries else "dzień wolny",
+        "%s h — a day off, edit it in Tempo" % esc(_hours(day.get("total_hours", 0)))
+        if entries else "day off",
         '<ul class="rest-entries">%s</ul>' % listing if entries else "",
     )
 
@@ -217,39 +216,39 @@ def body(payload):
     skipped = propose.get("skipped") or []
     weeks = _weeks(_editors(payload))
 
-    blocks = ['<div class="banner info">Zapis do Tempo następuje wyłącznie po kliknięciu '
-              'i potwierdzeniu. Harmonogram o 16:00 tylko wylicza propozycje. '
-              'Godziny chodzą po 15 minut; dzień poniżej 8 h wymaga „niepełnego dnia”, '
-              'powyżej — „nadgodzin”.</div>']
+    blocks = ['<div class="banner info">Nothing is written to Tempo without a click and a '
+              'confirmation. The 16:00 run only computes proposals. Hours move in steps of '
+              '15 minutes; a day under 8 h needs “short day”, one over it needs '
+              '“overtime”.</div>']
 
     if weeks:
         active = _active_week(weeks)
         bar = """<div class="week-bar">
-  <button type="button" class="ghost" data-week-step="-1" aria-label="poprzedni tydzień">◀</button>
+  <button type="button" class="ghost" data-week-step="-1" aria-label="previous week">◀</button>
   <strong data-week-label></strong>
   <span class="chip" data-week-total></span>
   <span class="spacer"></span>
-  <button type="button" class="ghost" data-week-step="1" aria-label="następny tydzień">▶</button>
+  <button type="button" class="ghost" data-week-step="1" aria-label="next week">▶</button>
 </div>"""
         weeks_html = "".join(_week(days, index, active) for index, days in enumerate(weeks))
         blocks.append(section(
-            "Tydzień po tygodniu",
+            "Week by week",
             '<div class="weeks" data-weeks data-active="%d">%s%s</div>' % (active, bar, weeks_html),
-            chip(plural(len(weeks), "tydzień", "tygodnie", "tygodni"))))
+            chip(count(len(weeks), "week"))))
     else:
         # Before the first refresh with worklogs there is nothing to lay a week over.
         plan = propose.get("plan") or []
         blocks.append(section(
-            "Propozycje do zalogowania",
-            "".join(_day(d, "propose") for d in plan) or empty("Nie ma dni z kompletną propozycją."),
-            chip(plural(len(plan), "dzień", "dni", "dni"))))
+            "Proposals to log",
+            "".join(_day(d, "propose") for d in plan) or empty("No day has a complete proposal."),
+            chip(count(len(plan), "day"))))
 
     if skipped:
         rows = [[esc(s["day"]), '<span class="muted">%s</span>' % esc(s.get("reason"))] for s in skipped]
-        blocks.append(section("Pominięte dni", table(["Dzień", "Powód"], rows), chip(str(len(skipped)))))
+        blocks.append(section("Days skipped", table(["Day", "Reason"], rows), chip(str(len(skipped)))))
 
-    blocks.append(section("Luki w Tempo",
-                          '<pre class="raw">%s</pre>' % esc((payload.get("gaps") or "").strip() or "Brak.")))
+    blocks.append(section("Gaps in Tempo",
+                          '<pre class="raw">%s</pre>' % esc((payload.get("gaps") or "").strip() or "None.")))
 
     return "".join(blocks)
 
@@ -259,7 +258,7 @@ def headline(payload):
     days = [d for d in ((payload.get("worklogs") or {}).get("days") or []) if d.get("workday")]
     logged = sum(d.get("total_hours", 0) for d in days)
 
-    return " ".join([chip("%s do zalogowania" % plural(len(plan), "dzień", "dni", "dni"),
+    return " ".join([chip("%s to log" % count(len(plan), "day"),
                           "wait" if plan else "ok"),
-                     chip("%s h w Tempo" % _hours(logged) if days
+                     chip("%s h in Tempo" % _hours(logged) if days
                           else "%s h" % _hours(sum(d.get("total_hours", 0) for d in plan)))])

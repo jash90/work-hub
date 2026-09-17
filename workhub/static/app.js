@@ -15,7 +15,7 @@ function ticketLink(key) {
 
 const THEMES = ['auto', 'light', 'dark'];
 const THEME_GLYPH = { auto: '◐', light: '☀', dark: '☾' };
-const THEME_TITLE = { auto: 'Motyw: automatyczny', light: 'Motyw: jasny', dark: 'Motyw: ciemny' };
+const THEME_TITLE = { auto: 'Theme: automatic', light: 'Theme: light', dark: 'Theme: dark' };
 
 function readTheme() {
   try {
@@ -75,7 +75,7 @@ function busy(ids, on) {
     for (const button of document.querySelectorAll(`[data-refresh="${id}"]`)) {
       button.disabled = on;
       button.setAttribute('aria-busy', String(on));
-      button.textContent = on ? 'Odświeżam' : 'Odśwież';
+      button.textContent = on ? 'Refreshing' : 'Refresh';
     }
   }
 }
@@ -105,7 +105,7 @@ async function follow(ids) {
       busy([panel.id], false);
       await repaint(panel);
 
-      if (panel.error && panel.fetched_at) toast(`${panel.label}: dane starsze, odświeżenie nie przeszło`, 'bad', 7000);
+      if (panel.error && panel.fetched_at) toast(`${panel.label}: showing older data, the refresh failed`, 'bad', 7000);
       else if (panel.error) toast(`${panel.label}: ${panel.error.slice(0, 160)}`, 'bad', 8000);
 
       if (document.querySelector('.grid')) refreshedCards = true;
@@ -137,7 +137,7 @@ document.addEventListener('click', async (event) => {
 
   busy(ids, true);
   if (all) event.target.closest('[data-refresh-all]').setAttribute('aria-busy', 'true');
-  toast(all ? 'Odświeżam wszystkie panele…' : 'Odświeżam…');
+  toast(all ? 'Refreshing every panel…' : 'Refreshing…');
   await follow(ids);
 });
 
@@ -151,7 +151,7 @@ function bindCopy(root) {
       );
 
       const ok = await toClipboard(text);
-      toast(ok ? 'Skopiowane do schowka' : 'Przeglądarka nie dała dostępu do schowka',
+      toast(ok ? 'Copied to the clipboard' : 'The browser refused access to the clipboard',
             ok ? 'ok' : 'bad');
     };
   }
@@ -195,7 +195,7 @@ function refreshDay(day) {
   day.dataset.valid = verdict.ok ? 'yes' : 'no';
   const submit = day.querySelector('[data-tempo-log]');
   submit.disabled = !verdict.ok;
-  submit.title = verdict.problem || 'Zapisze worklogi w Tempo';
+  submit.title = verdict.problem || 'Writes the worklogs to Tempo';
 
   return { entries: all.filter((e) => e.hours > 0), total: verdict.total, partial, overtime };
 }
@@ -224,16 +224,16 @@ function addEntryRow(day, key, hours) {
   row.dataset.entry = '';
   row.innerHTML = `
     <td class="entry-key">${ticketLink(key)}</td>
-    <td class="entry-summary"><span class="muted">dodane ręcznie</span></td>
+    <td class="entry-summary"><span class="muted">added by hand</span></td>
     <td class="entry-commits"></td>
     <td class="entry-hours">
       <div class="stepper">
-        <button type="button" class="step" data-step="-0.25" aria-label="mniej o 15 minut">−</button>
+        <button type="button" class="step" data-step="-0.25" aria-label="15 minutes less">−</button>
         <input type="text" class="hours" value="${fmt(hours)}" inputmode="decimal" autocomplete="off">
-        <button type="button" class="step" data-step="0.25" aria-label="więcej o 15 minut">+</button>
+        <button type="button" class="step" data-step="0.25" aria-label="15 minutes more">+</button>
       </div>
     </td>
-    <td class="entry-drop"><button type="button" class="ghost" data-drop aria-label="usuń pozycję">×</button></td>`;
+    <td class="entry-drop"><button type="button" class="ghost" data-drop aria-label="remove entry">×</button></td>`;
   body.appendChild(row);
 }
 
@@ -299,7 +299,7 @@ function bindTempo(root) {
 
         if (!/^[A-Z][A-Z0-9]*-\d+$/.test(key)) {
           keyField.setAttribute('aria-invalid', 'true');
-          toast(`Klucz ticketu wygląda jak ${KEY_HINT}-1234`, 'bad');
+          toast(`A ticket key looks like ${KEY_HINT}-1234`, 'bad');
 
           return;
         }
@@ -337,7 +337,7 @@ async function write(day, button, body, done) {
 
   if (data.ok) markStale(day, done);
 
-  toast(data.ok ? done : `Odmowa: ${(data.output || data.error || '').slice(0, 200)}`,
+  toast(data.ok ? done : `Refused: ${(data.output || data.error || '').slice(0, 200)}`,
         data.ok ? 'ok' : 'bad', data.ok ? 4000 : 9000);
 }
 
@@ -350,15 +350,15 @@ async function submitDay(day, button) {
   const listing = entries.map((e) => `  ${e.key} — ${fmt(e.hours)} h`).join('\n');
   let label = '';
 
-  if (total < target) label = ' (niepełny dzień)';
-  else if (total > target) label = ' (nadgodziny)';
+  if (total < target) label = ' (short day)';
+  else if (total > target) label = ' (overtime)';
 
-  if (!confirm(`Zapisać worklogi w Tempo za ${day.dataset.day}${label}?\n\n${listing}\n\nRazem ${fmt(total)} h. To jest realny POST do Jiry.`)) return;
+  if (!confirm(`Write worklogs to Tempo for ${day.dataset.day}${label}?\n\n${listing}\n\n${fmt(total)} h in total. This is a real POST to Jira.`)) return;
 
   await write(day, button, {
     endpoint: day.dataset.endpoint,
     payload: { entries: entriesString(entries), allow_partial: partial, allow_overtime: overtime },
-  }, `Zapisano ${day.dataset.day} — ${fmt(total)} h`);
+  }, `Saved ${day.dataset.day} — ${fmt(total)} h`);
 }
 
 // Clearing goes through the same declarative route as an edit: an empty split is a day with
@@ -366,18 +366,18 @@ async function submitDay(day, button) {
 async function clearDay(day, button) {
   if (day.dataset.stale) return;
 
-  if (!confirm(`Wyczyścić ${day.dataset.day} w Tempo? Skasuje wszystkie worklogi tego dnia.`)) return;
+  if (!confirm(`Clear ${day.dataset.day} in Tempo? This deletes every worklog on that day.`)) return;
 
   await write(day, button, { endpoint: '/api/tempo/replace', payload: { entries: '' } },
-              `Wyczyszczono ${day.dataset.day}`);
+              `Cleared ${day.dataset.day}`);
 }
 
 async function undoDay(day, button) {
   if (day.dataset.stale) return;
 
-  if (!confirm(`Cofnąć worklogi za ${day.dataset.day}? Skasuje je z Jiry.`)) return;
+  if (!confirm(`Undo the worklogs for ${day.dataset.day}? They will be deleted from Jira.`)) return;
 
-  await write(day, button, { endpoint: '/api/tempo/undo', payload: {} }, `Cofnięto ${day.dataset.day}`);
+  await write(day, button, { endpoint: '/api/tempo/undo', payload: {} }, `Undone ${day.dataset.day}`);
 }
 
 function bindWeeks(root) {
@@ -450,8 +450,8 @@ function bindPicker(root) {
     const update = () => {
       const chosen = picked();
       count.textContent = chosen.length
-        ? `${chosen.length} z ${plural(boxes().length, 'MR-a', 'MR-ów', 'MR-ów')}`
-        : 'nic nie zaznaczone';
+        ? `${chosen.length} of ${count(boxes().length, 'MR')}`
+        : 'nothing selected';
       copy.disabled = !chosen.length;
 
       for (const master of masters) {
@@ -477,8 +477,8 @@ function bindPicker(root) {
     copy.onclick = async () => {
       const links = picked().map((box) => box.dataset.url);
       const ok = await toClipboard(links.join('\n'));
-      toast(ok ? `Skopiowano ${plural(links.length, 'link', 'linki', 'linków')}`
-               : 'Przeglądarka nie dała dostępu do schowka', ok ? 'ok' : 'bad');
+      toast(ok ? `Copied ${count(links.length, 'link')}`
+               : 'The browser refused access to the clipboard', ok ? 'ok' : 'bad');
     };
 
     update();
@@ -522,12 +522,12 @@ function bindSettings(root) {
     save.disabled = false;
 
     if (!data.ok) {
-      toast(`Nie zapisano: ${(data.error || '').slice(0, 200)}`, 'bad', 9000);
+      toast(`Not saved: ${(data.error || '').slice(0, 200)}`, 'bad', 9000);
 
       return;
     }
 
-    toast(`Zapisano ${data.saved.length} ustawień`, 'ok');
+    toast(`Saved ${count(data.saved.length, 'setting')}`, 'ok');
     // Re-render so every field reports its stored state instead of what was typed into it.
     setTimeout(() => window.location.reload(), 600);
   });

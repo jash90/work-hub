@@ -6,7 +6,7 @@ from workhub import links
 
 RELEASES = {"main": {"mrs": {
     "ABC-1": [{"key": "ABC-1", "iid": "706", "web_url": "https://gl/706",
-                  "repo": "team-portal", "title": "fix(ABC-1): coś",
+                  "repo": "team-portal", "title": "fix(ABC-1): something",
                   "approval_count": 2, "unresolved": 0}],
 }}}
 
@@ -60,7 +60,7 @@ class BuildingTheIndex(unittest.TestCase):
         self.assertEqual({}, index)
 
     def test_a_broken_payload_does_not_break_the_join(self):
-        index = links.build(read=lambda panel_id: RELEASES if panel_id == "releases" else "śmieci")
+        index = links.build(read=lambda panel_id: RELEASES if panel_id == "releases" else "garbage")
 
         self.assertIn("ABC-1", index)
 
@@ -75,7 +75,7 @@ class DriftRows(unittest.TestCase):
     """A ticket in testing has a merged MR, which only the drift rows still mention."""
 
     def index(self, url):
-        payload = {"main": {"drift": [{"label": "ABC-7", "url": url, "detail": "MR wjechał"}]}}
+        payload = {"main": {"drift": [{"label": "ABC-7", "url": url, "detail": "the MR landed"}]}}
 
         return links.build(read=lambda panel_id: payload if panel_id == "dashboard" else None)
 

@@ -6,19 +6,19 @@ from workhub.render import layout
 
 DASHBOARD = {"main": {
     "min_approvals": 2,
-    "tasks": [{"key": "ABC-1", "status": "Backlog", "summary": "Coś", "days": 1,
+    "tasks": [{"key": "ABC-1", "status": "Backlog", "summary": "Something", "days": 1,
                "release_name": "Apple_Android TV 12.0.0", "bucket": 1,
                "mrs": [{"iid": "676", "web_url": "https://example/676"}]}],
     "ready": [],
-    "other_mrs": [{"iid": "721", "repo": "team-portal", "title": "fix: coś",
+    "other_mrs": [{"iid": "721", "repo": "team-portal", "title": "fix: something",
                    "web_url": "https://example/721", "approval_count": 1, "unresolved": 2,
-                   "blocking": ["pipeline w toku"], "draft": False}],
+                   "blocking": ["pipeline running"], "draft": False}],
     "review": {"summary": {"total": 3, "mrs": 2, "on_me": 1, "counts": {"waiting_for_me": 1}},
                "threads": [{"kind": "waiting_for_me", "iid": "1411", "repo": "team-mobile",
-                            "file": "index.tsx", "line": 88, "excerpt": "pytanie",
+                            "file": "index.tsx", "line": 88, "excerpt": "a question",
                             "url": "https://example/1411", "waited_days": 1}]},
     "drift": [{"kind": "not_in_review", "label": "ABC-1", "status": "Backlog",
-               "detail": "podnieś status", "url": "https://example/676"}],
+               "detail": "raise the status", "url": "https://example/676"}],
 }}
 
 
@@ -28,12 +28,12 @@ class Rendering(unittest.TestCase):
 
         self.assertIn("ABC-1", html)
         self.assertIn("!721", html)
-        self.assertIn("jutro", html)
-        self.assertIn("2 wątki", html)
+        self.assertIn("tomorrow", html)
+        self.assertIn("2 threads", html)
 
     def test_headline_counts_agree_with_the_payload(self):
-        self.assertIn("1 task do zrobienia", render.RENDERERS["dashboard"][1](DASHBOARD))
-        self.assertIn("1 uwaga u mnie", render.RENDERERS["dashboard"][1](DASHBOARD))
+        self.assertIn("1 task to do", render.RENDERERS["dashboard"][1](DASHBOARD))
+        self.assertIn("1 comment on me", render.RENDERERS["dashboard"][1](DASHBOARD))
 
     def test_every_panel_has_a_renderer(self):
         from workhub import sources
@@ -41,12 +41,12 @@ class Rendering(unittest.TestCase):
         self.assertEqual(sorted(p.id for p in sources.PANELS), sorted(render.RENDERERS))
 
     def test_a_broken_payload_degrades_to_a_banner(self):
-        html = render.body("dashboard", {"payload": {"main": "nie ten kształt"}})
+        html = render.body("dashboard", {"payload": {"main": "not the expected shape"}})
 
-        self.assertIn("Nie udało się wyrenderować", html)
+        self.assertIn("Could not render", html)
 
     def test_missing_payload_asks_for_a_refresh(self):
-        self.assertIn("Odśwież", render.body("dashboard", {"payload": None}))
+        self.assertIn("Refresh", render.body("dashboard", {"payload": None}))
 
 
 class Navigation(unittest.TestCase):
@@ -70,18 +70,18 @@ class Navigation(unittest.TestCase):
 
     def test_header_names_the_open_panel(self):
         self.assertEqual("Tempo", layout.crumb("tempo"))
-        self.assertEqual("Przegląd", layout.crumb(""))
+        self.assertEqual("Overview", layout.crumb(""))
 
 
 TEMPO = {
-    "gaps": "# brak",
+    "gaps": "# none",
     "propose": {"plan": [{"day": "2026-09-10", "weekday": "Thu", "total_hours": 8.0,
-                          "entries": [{"key": "ABC-9", "summary": "Propozycja", "hours": 8.0,
+                          "entries": [{"key": "ABC-9", "summary": "Proposal", "hours": 8.0,
                                        "seconds": 28800, "commits": 3, "subjects": ["x"]}]}],
                 "skipped": []},
     "worklogs": {"from": "2026-09-07", "to": "2026-09-13", "days": [
         {"day": "2026-09-07", "weekday": "Mon", "workday": True, "total_hours": 8.0,
-         "entries": [{"id": 1404459, "key": "ABC-1", "summary": "Zalogowane",
+         "entries": [{"id": 1404459, "key": "ABC-1", "summary": "Logged",
                       "hours": 8.0, "seconds": 28800, "comment": ""}]},
         {"day": "2026-09-08", "weekday": "Tue", "workday": True, "total_hours": 0, "entries": []},
         {"day": "2026-09-09", "weekday": "Wed", "workday": True, "total_hours": 0, "entries": []},
@@ -102,7 +102,7 @@ class TempoPanel(unittest.TestCase):
 
         self.assertIn('data-worklog-id="1404459"', html)
         self.assertIn('data-endpoint="/api/tempo/replace"', html)
-        self.assertIn("Zapisz zmiany", html)
+        self.assertIn("Save changes", html)
 
     def test_a_day_with_a_proposal_still_goes_through_log(self):
         html = self.html()
@@ -124,7 +124,7 @@ class TempoPanel(unittest.TestCase):
     def test_a_weekend_is_shown_but_not_editable(self):
         html = self.html()
 
-        self.assertIn("dzień wolny", html)
+        self.assertIn("day off", html)
         self.assertNotIn('data-day="2026-09-12"', html)
 
     def test_days_without_worklogs_still_appear(self):
@@ -134,7 +134,7 @@ class TempoPanel(unittest.TestCase):
     def test_the_week_carries_its_own_label_and_total(self):
         html = self.html()
 
-        self.assertIn('data-label="7 września – 13 września"', html)
+        self.assertIn('data-label="September 7 – September 13"', html)
         self.assertIn('data-total="8 h / 40 h"', html)
 
     def test_it_still_renders_before_the_first_worklog_refresh(self):
@@ -157,9 +157,9 @@ class Escaping(unittest.TestCase):
 
 class Notes(unittest.TestCase):
     def test_fallback_note_is_shown(self):
-        html = layout.notes({"_notes": {"main": "Pełny skład niedostępny"}})
+        html = layout.notes({"_notes": {"main": "The full team is unavailable"}})
 
-        self.assertIn("Pełny skład niedostępny", html)
+        self.assertIn("The full team is unavailable", html)
 
 
 class Settings(unittest.TestCase):
@@ -186,18 +186,18 @@ class Settings(unittest.TestCase):
         return settings.page_body()
 
     def test_a_stored_token_is_described_never_printed(self):
-        self.config.save({"JIRA_TOKEN": "bardzo-tajne-4f2c"})
+        self.config.save({"JIRA_TOKEN": "very-secret-4f2c"})
         html = self.html()
 
-        self.assertNotIn("bardzo-tajne", html)
+        self.assertNotIn("very-secret", html)
         self.assertIn("…4f2c", html)
 
     def test_a_secret_field_comes_up_empty_so_a_save_cannot_echo_it_back(self):
-        self.config.save({"JIRA_TOKEN": "tajne"})
+        self.config.save({"JIRA_TOKEN": "secret"})
         html = self.html()
 
         self.assertIn('type="password"', html)
-        self.assertNotIn('value="tajne"', html)
+        self.assertNotIn('value="secret"', html)
 
     def test_every_setting_has_a_field(self):
         html = self.html()
@@ -216,7 +216,7 @@ class Settings(unittest.TestCase):
         html = layout.page("t", "settings", "<p>x</p>", "csrf")
 
         self.assertIn('href="/settings" class="on"', html)
-        self.assertIn("Ustawienia", layout.crumb("settings"))
+        self.assertIn("Settings", layout.crumb("settings"))
 
 
 class TicketLinks(unittest.TestCase):

@@ -51,7 +51,7 @@ blank field has to mean "leave it alone" for a form that cannot show what it hol
 | `JIRA_BASE_URL` | builds `…/browse/KEY` links **in this UI only** — see below |
 | `JIRA_PROJECT_KEYS` | comma-separated; the first is the placeholder in the Tempo day editor |
 | `TEMPO_USER` | whose worklogs. Tempo has no token of its own — it uses the Jira PAT. |
-| `WORK_HUB_PORT`, `WORK_HUB_PORANEK`, `WORK_HUB_POPOLUDNIE` | read at start-up, so a change needs a restart |
+| `WORK_HUB_PORT`, `WORK_HUB_MORNING`, `WORK_HUB_AFTERNOON` | read at start-up, so a change needs a restart |
 
 Saved values are laid over `os.environ` in `runner._env()` — the one place every subprocess
 gets its environment, so a token takes effect on the next panel run with no restart and the
@@ -64,7 +64,7 @@ hub never holds a secret in memory. `os.environ` itself is not touched.
 - `redge_work.auth` resolves a token **Keychain → environment → file**, so a Keychain entry
   silently outranks anything saved here. The settings screen says so when it finds one.
 - `tempo-fill` reads the Jira token *only* from `~/.claude/.secrets/jira-token` and never looks
-  at the environment. The "zapisz też do ~/.claude/.secrets" checkbox mirrors it there;
+  at the environment. The "also write to ~/.claude/.secrets" checkbox mirrors it there;
   without it, a token saved here works everywhere except writing worklogs.
 
 ## Schedule
@@ -73,15 +73,15 @@ Two groups, run by a thread inside the server process:
 
 | group | time | panels |
 |---|---|---|
-| poranek | 10:00 | dashboard, releases, priority, review-queue, pr-request, testing |
-| po pracy | 16:00 | dashboard, releases, commits, tempo |
-| na żądanie | — | protokol (monthly and expensive) |
+| morning | 10:00 | dashboard, releases, priority, review-queue, pr-request, testing |
+| after work | 16:00 | dashboard, releases, commits, tempo |
+| on demand | — | protokol (monthly and expensive) |
 
 It is **catch-up, not cron**: a group is due when its time has passed today and it has not
 run today. A Mac asleep until 14:00 runs the morning group once on wake instead of losing
 it — which is why the schedule lives here rather than in extra launchd agents. Weekdays only.
 
-Override the times with `WORK_HUB_PORANEK=10:30` / `WORK_HUB_POPOLUDNIE=17:00`.
+Override the times with `WORK_HUB_MORNING=10:30` / `WORK_HUB_AFTERNOON=17:00`.
 
 ## Writing to Jira
 
@@ -114,13 +114,13 @@ submitted until it is actually writable, so a bad split is caught in the browser
 coming back as the skill's `sys.exit`.
 
 - entries can be removed, and a ticket can be added by key for work with no commit behind it;
-- **niepełny dzień** and **nadgodziny** are separate opt-ins, passing `--allow-partial` and
+- **short day** and **overtime** are separate opt-ins, passing `--allow-partial` and
   `--allow-overtime`. They are separate because the skill treats the two directions
   separately: neither flag quietly excuses the other;
 - a written day is greyed out until the panel refresh lands. Its worklog ids are a moment
   old, so a second submit would post the new rows again rather than edit them;
 - hour fields are text, not `type=number`: Chrome renders a number input in the page locale, so
-  a Polish decimal comma typed by hand would read back as an empty value. `parseHours` accepts
+  a decimal comma typed by hand would read back as an empty value. `parseHours` accepts
   `1,75` and `1.75` alike, and flags anything else instead of silently treating it as zero;
 - the decimal comma is rejected again server-side — the skill parses hours with `float()`.
 
@@ -130,9 +130,9 @@ tested by running them under Node (`tests/test_day_rules.py`).
 ## Two panels need Claude
 
 `commits` and `protokol` show what their scripts produce on their own and offer a
-**„Skopiuj brief dla Claude"** button; the narrative (daily-commit-summary's `plain` field)
-and the legal rewrite (protokół odbioru) still happen in a Claude Code session. The hub does
-not pretend to have prose it has not got.
+**“Copy the brief for Claude”** button; the narrative (daily-commit-summary's `plain` field)
+and the legal rewrite (the acceptance report) still happen in a Claude Code session. The hub
+does not pretend to have prose it has not got.
 
 ## Running it
 
@@ -171,8 +171,8 @@ The stylesheet is a port of the shadcn/ui design language into plain CSS — the
 badge, alert, table, input, tabs) and the same focus-visible ring. No React, no Tailwind, no
 build step, so the hub keeps its zero-dependency start-up.
 
-Navigation is a permanent left rail, grouped the way the overview is — poranek, po pracy,
-na żądanie. Below 860px it slides away behind the header's hamburger and closes on Escape,
+Navigation is a permanent left rail, grouped the way the overview is — morning, after work,
+on demand. Below 860px it slides away behind the header's hamburger and closes on Escape,
 the scrim or a link, because a fixed rail would eat a phone screen; above it, it is simply
 part of the layout. The header carries the current panel's name, the theme toggle and the
 global refresh.
@@ -225,8 +225,8 @@ without ever running it. The day-rule tests shell out to Node and skip when it i
 
 No third-party packages: standard library on `/usr/bin/python3` (3.9).
 
-It is **not self-contained**, though. `~/.claude/lib/redge_work` (atomic cache writes, Polish
-plurals, the token resolver) is imported by eight modules at load time, and the panels shell
+It is **not self-contained**, though. `~/.claude/lib/redge_work` (atomic cache writes and
+the token resolver) is imported at load time, and the panels shell
 out to nine scripts under `~/.claude/skills`. Neither is published here, so a clone of this
 repository alone will raise `ImportError` before the server starts. `glab` must also be on
 PATH for `review-queue` and `protokol`.

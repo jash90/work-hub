@@ -98,7 +98,7 @@ class Handler(BaseHTTPRequestHandler):
             panel_id = path[len("/api/"):]
 
             if panel_id not in sources.BY_ID:
-                return self._json(404, {"error": "nieznany panel"})
+                return self._json(404, {"error": "unknown panel"})
 
             return self._json(200, store.read(panel_id) or store.blank(panel_id))
 
@@ -108,21 +108,21 @@ class Handler(BaseHTTPRequestHandler):
             panel_id = rest[:-len("/fragment")] if fragment else rest
 
             if panel_id not in sources.BY_ID:
-                return self._send(404, "nie ma takiego panelu", "text/plain; charset=utf-8")
+                return self._send(404, "no such panel", "text/plain; charset=utf-8")
 
             if fragment:
                 return self._send(200, render.fragment(panel_id))
 
             return self._send(200, render.panel_page(self.hub, panel_id))
 
-        return self._send(404, "nie ma takiej strony", "text/plain; charset=utf-8")
+        return self._send(404, "no such page", "text/plain; charset=utf-8")
 
     def do_POST(self):
         if not self._host_is_local():
-            return self._json(403, {"error": "tylko localhost"})
+            return self._json(403, {"error": "localhost only"})
 
         if self.headers.get("X-CSRF") != self.hub.csrf:
-            return self._json(403, {"error": "brak lub zły token CSRF"})
+            return self._json(403, {"error": "missing or wrong CSRF token"})
 
         path = urllib.parse.urlparse(self.path).path
         body = self._body()
@@ -136,18 +136,18 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/api/tempo/log", "/api/tempo/replace", "/api/tempo/undo"):
             return self._tempo_write(body, path.rsplit("/", 1)[1])
 
-        return self._json(404, {"error": "nieznana trasa"})
+        return self._json(404, {"error": "unknown route"})
 
     # ---------- handlers ----------
 
     def _static(self, name):
         if "/" in name or ".." in name:
-            return self._send(403, "nie", "text/plain; charset=utf-8")
+            return self._send(403, "no", "text/plain; charset=utf-8")
 
         full = os.path.join(STATIC, name)
 
         if not os.path.isfile(full):
-            return self._send(404, "brak pliku", "text/plain; charset=utf-8")
+            return self._send(404, "no such file", "text/plain; charset=utf-8")
 
         with open(full, "rb") as handle:
             blob = handle.read()
@@ -181,7 +181,7 @@ class Handler(BaseHTTPRequestHandler):
             panel_id = body.get("panel")
 
             if panel_id not in sources.BY_ID:
-                return self._json(400, {"error": "nieznany panel"})
+                return self._json(400, {"error": "unknown panel"})
 
             targets = [panel_id]
 
@@ -198,14 +198,14 @@ class Handler(BaseHTTPRequestHandler):
         values = body.get("values")
 
         if not isinstance(values, dict):
-            return self._json(400, {"error": "brak ustawień do zapisania"})
+            return self._json(400, {"error": "no settings to save"})
 
         try:
             saved = config.save(values)
         except KeyError as exc:
-            return self._json(400, {"error": "nieznane ustawienie: %s" % exc.args[0]})
+            return self._json(400, {"error": "unknown setting: %s" % exc.args[0]})
         except OSError as exc:
-            return self._json(500, {"error": "nie udało się zapisać .env: %s" % exc})
+            return self._json(500, {"error": "could not write .env: %s" % exc})
 
         written = config.sync_secret_files(saved) if body.get("sync_secrets") is True else []
 
@@ -216,12 +216,12 @@ class Handler(BaseHTTPRequestHandler):
         from . import tempo
 
         if body.get("confirm") is not True:
-            return self._json(400, {"error": "zapis wymaga potwierdzenia"})
+            return self._json(400, {"error": "a write needs a confirmation"})
 
         day = (body.get("day") or "").strip()
 
         if not tempo.is_day(day):
-            return self._json(400, {"error": "zły format dnia (YYYY-MM-DD)"})
+            return self._json(400, {"error": "bad day format (YYYY-MM-DD)"})
 
         if action == "undo":
             result = tempo.undo_day(day)
@@ -252,20 +252,20 @@ def _bind(address, port):
 def serve(port=None):
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    port = int(port or os.environ.get("WORK_HUB_PORT") or 8787)
+    port = int(port or config.get("WORK_HUB_PORT") or 8787)
     Handler.hub = Hub()
     Handler.hub.scheduler.start()
 
     servers = [s for s in (_bind("127.0.0.1", port), _bind("::1", port)) if s]
 
     if not servers:
-        raise SystemExit("work-hub: port %d jest zajęty" % port)
+        raise SystemExit("work-hub: port %d is taken" % port)
 
     for extra in servers[1:]:
         threading.Thread(target=extra.serve_forever, daemon=True).start()
 
     print("work-hub: http://localhost:%d (%d %s)" % (
-        port, len(servers), "gniazdo" if len(servers) == 1 else "gniazda"), flush=True)
+        port, len(servers), "socket" if len(servers) == 1 else "sockets"), flush=True)
 
     try:
         servers[0].serve_forever()

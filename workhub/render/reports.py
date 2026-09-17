@@ -4,22 +4,24 @@
 rest to Claude Code through a copyable brief. The hub never invents the narrative it does
 not have.
 """
-from redge_work.polish import plural
-
+from ..text import count
 from .layout import chip, copy_button, empty, esc, section, table, ticket_link
 
-COMMITS_BRIEF = """Odpal skill daily-commit-summary i zbuduj z poniższych danych raport HTML
-(pole `plain` po ludzku, 2-3 zdania). Dane są już zebrane, nie zbieraj ich ponownie.
+COMMITS_BRIEF = """Run the daily-commit-summary skill and build an HTML report from the data
+below (the `plain` field in plain words, 2-3 sentences). The data is already gathered — do
+not collect it again.
 
-=== COMMITY ===
+=== COMMITS ===
 %s
 
-=== STATUS MERGE ===
+=== MERGE STATUS ===
 %s
 """
 
-PROTOKOL_BRIEF = """Odpal skill protokol-odbioru za miesiąc %s. Poniżej zebrane pozycje —
-przepisz każdą na wymagany język prawniczy („Kod źródłowy …") i wypełnij template.docx.
+# The report itself is a Polish legal document, so the phrasing it asks for stays Polish —
+# only the instruction around it is in English.
+PROTOKOL_BRIEF = """Run the protokol-odbioru skill for %s. The gathered items are below —
+rewrite each one in the required legal phrasing („Kod źródłowy …") and fill in template.docx.
 
 %s
 """
@@ -30,9 +32,9 @@ def commits_body(payload):
     merge = payload.get("merge") or ""
 
     blocks = [
-        section("Commity dnia", '<pre class="raw">%s</pre>' % esc(commits.strip() or "Brak commitów."),
-                copy_button("Skopiuj brief dla Claude", COMMITS_BRIEF % (commits, merge))),
-        section("Status merge", '<pre class="raw">%s</pre>' % esc(merge.strip() or "Brak danych.")),
+        section("Commits today", '<pre class="raw">%s</pre>' % esc(commits.strip() or "No commits."),
+                copy_button("Copy the brief for Claude", COMMITS_BRIEF % (commits, merge))),
+        section("Merge status", '<pre class="raw">%s</pre>' % esc(merge.strip() or "No data.")),
     ]
 
     return "".join(blocks)
@@ -43,8 +45,8 @@ def commits_headline(payload):
     lines = [l for l in text.splitlines() if " | " in l]
     repos = [l for l in text.splitlines() if l.startswith("=====")]
 
-    return " ".join([chip(plural(len(lines), "commit", "commity", "commitów")),
-                     chip("%s" % plural(len(repos), "repozytorium", "repozytoria", "repozytoriów"))])
+    return " ".join([chip(count(len(lines), "commit")),
+                     chip(count(len(repos), "repository", "repositories"))])
 
 
 def protokol_body(payload):
@@ -65,9 +67,9 @@ def protokol_body(payload):
                    for i in items]
 
     return section(
-        "Pozycje miesiąca %s" % (data.get("month") or ""),
-        table(["Ticket", "Produkt", "Platformy", "Temat"], rows) or empty("Brak pozycji."),
-        copy_button("Skopiuj brief dla Claude",
+        "Items for %s" % (data.get("month") or ""),
+        table(["Ticket", "Product", "Platforms", "Summary"], rows) or empty("No items."),
+        copy_button("Copy the brief for Claude",
                     PROTOKOL_BRIEF % (data.get("month") or "", "\n".join(brief_lines))))
 
 
@@ -76,4 +78,4 @@ def protokol_headline(payload):
     items = data.get("items") or []
 
     return " ".join([chip(data.get("month") or "—"),
-                     chip(plural(len(items), "pozycja", "pozycje", "pozycji"))])
+                     chip(count(len(items), "item"))])

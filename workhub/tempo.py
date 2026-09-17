@@ -44,7 +44,7 @@ def _run(action, day, argv):
         output = (proc.stdout or "") + (proc.stderr or "")
         result = {"ok": proc.returncode == 0, "output": output.strip(), "exit_code": proc.returncode}
     except (OSError, subprocess.SubprocessError) as exc:
-        result = {"ok": False, "output": "nie udało się uruchomić tempo.py: %s" % exc, "exit_code": None}
+        result = {"ok": False, "output": "could not run tempo.py: %s" % exc, "exit_code": None}
 
     _record(action, day, argv[2:], result)
 
@@ -86,7 +86,7 @@ def write_day(action, day, entries, allow_partial=False, allow_overtime=False):
     entries = (entries or "").replace(" ", "")
 
     if entries and not ENTRIES.match(entries):
-        return {"ok": False, "output": "zły format wpisów — oczekiwane KEY=h,KEY=h (godziny z kropką)",
+        return {"ok": False, "output": "bad entry format — expected KEY=h,KEY=h (hours with a dot)",
                 "exit_code": None}
 
     return _run(action, day, write_argv(action, day, entries, allow_partial, allow_overtime))

@@ -11,14 +11,14 @@ import os
 
 SKILLS = os.path.expanduser("~/.claude/skills")
 
-MORNING = "poranek"
-AFTERNOON = "popoludnie"
+MORNING = "morning"
+AFTERNOON = "afternoon"
 ON_DEMAND = "on_demand"
 
 GROUP_LABELS = {
-    MORNING: "Poranek (10:00)",
-    AFTERNOON: "Po pracy (16:00)",
-    ON_DEMAND: "Na żądanie",
+    MORNING: "Morning (10:00)",
+    AFTERNOON: "After work (16:00)",
+    ON_DEMAND: "On demand",
 }
 
 JSON = "json"
@@ -80,32 +80,32 @@ PANELS = (
     # dashboard runs first on purpose: it fills the shared ~/.claude/cache/mr-index.json
     # that four other panels read, so they hit the cache instead of GitLab.
     Panel(
-        "dashboard", "Moja praca", "Taski do zrobienia, MR-y gotowe do mergu, moje uwagi w cudzych MR-ach, rozjazd Jira ↔ GitLab.",
+        "dashboard", "My work", "Tasks to start, merge requests ready to merge, my comments on other people's MRs, Jira ↔ GitLab drift.",
         (MORNING, AFTERNOON),
         [Command("main", [PY3, skill("my-work-dashboard", "scripts", "dashboard.py"), "--json"])],
     ),
     Panel(
-        "releases", "Tablica release'owa", "Każde wydanie z moim taskiem, w pełnym składzie zespołu, ze stanem MR-ów.",
+        "releases", "Release board", "Every release carrying a task of mine, with the whole team and the state of their MRs.",
         (MORNING, AFTERNOON),
         [Command(
             "main", [PY3, skill("release-dashboard", "scripts", "release_dashboard.py"), "--json"],
             fallback=Command("main", [PY3, skill("release-dashboard", "scripts", "release_dashboard.py"),
                                       "--mine-only", "--json"]),
-            fallback_note="Pełny skład zespołu niedostępny — Jira odrzuciła zapytanie o wersje (HTTP 400). "
-                          "Pokazane są wyłącznie moje taski.")],
+            fallback_note="The full team is unavailable — Jira refused the version query (HTTP 400). "
+                          "Only my own tasks are shown.")],
     ),
     Panel(
-        "priority", "Priorytet wydania", "Moje nierozwiązane taski uszeregowane po dacie wydania.",
+        "priority", "Release priority", "My unresolved tasks ordered by release date.",
         (MORNING,),
         [Command("main", [PY3, skill("jira-release-priority", "release_priority.py"), "--json"])],
     ),
     Panel(
-        "review-queue", "Kolejka review", "Cudze otwarte MR-y w kolejności wydań — od czego zacząć review.",
+        "review-queue", "Review queue", "Other people's open MRs in release order — where to start reviewing.",
         (MORNING,),
         [Command("main", [PY3, skill("mr-review-queue", "scripts", "build_queue.py"), "--json"])],
     ),
     Panel(
-        "pr-request", "Prośba o review", "Moje MR-y bez kompletu approve — gotowy post do wklejenia.",
+        "pr-request", "Review request", "My MRs short of approvals — a post ready to paste.",
         (MORNING,),
         [
             Command("main", [PY3, skill("pr-review-request", "make_post.py"), "--json"]),
@@ -113,12 +113,12 @@ PANELS = (
         ],
     ),
     Panel(
-        "testing", "Moje w testach", "Co wypchnąłem do Internal testing i co z tego przeszło dalej.",
+        "testing", "Mine in testing", "What I pushed to Internal testing and what moved on from there.",
         (MORNING,),
         [Command("main", [PY3, skill("jira-my-testing-status", "check_status.py"), "--json"])],
     ),
     Panel(
-        "commits", "Commity dnia", "Co dziś wpadło do repozytoriów i czy jest już na develop.",
+        "commits", "Commits today", "What landed in the repositories today and whether it is on develop yet.",
         (AFTERNOON,),
         [
             Command("commits", [skill("daily-commit-summary", "gather-commits.sh"), "today"], TEXT),
@@ -126,7 +126,7 @@ PANELS = (
         ],
     ),
     Panel(
-        "tempo", "Tempo", "Tydzień po tygodniu: co już jest w Tempo i co dopisać z commitów.",
+        "tempo", "Tempo", "Week by week: what Tempo already holds and what to add from commits.",
         (AFTERNOON,),
         [
             Command("gaps", [PY3, skill("tempo-fill", "tempo.py"), "gaps"], TEXT),
@@ -137,7 +137,7 @@ PANELS = (
         ],
     ),
     Panel(
-        "protokol", "Protokół odbioru", "Tickety bieżącego miesiąca z godzinami — podstawa protokołu.",
+        "protokol", "Acceptance report", "This month's tickets with their hours — the basis of the report.",
         (ON_DEMAND,),
         [Command("main", lambda: [PY3, skill("protokol-odbioru", "gather.py"),
                                   "--month", current_month(), "--json"])],

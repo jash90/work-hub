@@ -16,7 +16,7 @@ const cases = JSON.parse(process.argv[1]);
 const out = cases.map((c) => {
   if (c.kind === 'parse') return parseHours(c.raw);
   if (c.kind === 'round') return round15(c.value);
-  return dayVerdict(c.hours.map((h) => (h === 'zle' ? parseHours('abc') : h)), c.target, c.partial, c.overtime);
+  return dayVerdict(c.hours.map((h) => (h === 'bad' ? parseHours('abc') : h)), c.target, c.partial, c.overtime);
 });
 process.stdout.write(JSON.stringify(out));
 """
@@ -33,7 +33,7 @@ def node_run(cases):
     return json.loads(proc.stdout)
 
 
-@unittest.skipUnless(shutil.which("node"), "node nie jest zainstalowany")
+@unittest.skipUnless(shutil.which("node"), "node is not installed")
 class DayVerdict(unittest.TestCase):
     def verdict(self, hours, target=8, partial=False, overtime=False):
         return node_run([{"kind": "day", "hours": hours, "target": target,
@@ -49,25 +49,25 @@ class DayVerdict(unittest.TestCase):
         verdict = self.verdict([5, 1.75])
 
         self.assertFalse(verdict["ok"])
-        self.assertIn("brakuje 1.25 h", verdict["problem"])
+        self.assertIn("1.25 h short", verdict["problem"])
 
     def test_a_short_day_passes_when_marked_partial(self):
         verdict = self.verdict([6], partial=True)
 
         self.assertTrue(verdict["ok"])
-        self.assertIn("niepełny dzień", verdict["note"])
+        self.assertIn("short day", verdict["note"])
 
     def test_a_long_day_is_blocked_and_says_by_how_much(self):
         verdict = self.verdict([8, 1])
 
         self.assertFalse(verdict["ok"])
-        self.assertIn("1 h ponad 8 h", verdict["problem"])
+        self.assertIn("1 h over 8 h", verdict["problem"])
 
     def test_a_long_day_passes_when_marked_overtime(self):
         verdict = self.verdict([8, 1], overtime=True)
 
         self.assertTrue(verdict["ok"])
-        self.assertIn("nadgodziny", verdict["note"])
+        self.assertIn("overtime", verdict["note"])
 
     def test_partial_does_not_quietly_allow_overtime(self):
         """The skill treats the two directions separately; the browser must not be laxer."""
@@ -81,13 +81,13 @@ class DayVerdict(unittest.TestCase):
         verdict = self.verdict([1.1, 6.9])
 
         self.assertFalse(verdict["ok"])
-        self.assertIn("15 minut", verdict["problem"])
+        self.assertIn("15 minutes", verdict["problem"])
 
     def test_an_empty_day_is_blocked(self):
-        self.assertIn("przynajmniej jedną", self.verdict([])["problem"])
+        self.assertIn("at least one", self.verdict([])["problem"])
 
     def test_unparsable_hours_are_blocked(self):
-        self.assertIn("liczbą", self.verdict(["zle", 8])["problem"])
+        self.assertIn("must be a number", self.verdict(["bad", 8])["problem"])
 
     def test_many_quarters_still_add_up_exactly(self):
         """Floating point: 32 x 0.25 must read as 8, not 7.999999999999999."""
@@ -97,7 +97,7 @@ class DayVerdict(unittest.TestCase):
         self.assertEqual(8, verdict["total"])
 
 
-@unittest.skipUnless(shutil.which("node"), "node nie jest zainstalowany")
+@unittest.skipUnless(shutil.which("node"), "node is not installed")
 class ParsingHours(unittest.TestCase):
     def parse(self, raw):
         return node_run([{"kind": "parse", "raw": raw}])[0]

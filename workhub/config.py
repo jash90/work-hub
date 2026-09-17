@@ -30,36 +30,37 @@ class Setting:
         self.restart = restart
 
 
-TOKENS = "Tokeny"
-JIRA = "Jira i GitLab"
+TOKENS = "Tokens"
+JIRA = "Jira and GitLab"
 HUB = "Hub"
 
 SETTINGS = (
     Setting("JIRA_TOKEN", "Jira — Personal Access Token", TOKENS, secret=True,
-            note="Używany przez większość paneli. Zapis worklogów czyta go wyłącznie z pliku "
-                 "w ~/.claude/.secrets — zaznacz synchronizację poniżej, inaczej Tempo go nie zobaczy."),
+            note="Used by most panels. Worklog writing reads it only from the file under "
+                 "~/.claude/.secrets — tick the mirror below or Tempo will not see it."),
     Setting("GITLAB_TOKEN", "GitLab — Personal Access Token", TOKENS, secret=True,
-            note="Kolejka review, pr-request i wspólny indeks merge requestów."),
+            note="The review queue, the review request and the shared merge-request index."),
     Setting("CONFLUENCE_TOKEN", "Confluence — Personal Access Token", TOKENS, secret=True,
-            note="Żaden panel jeszcze go nie używa; przechowywany dla skilli sięgających po Confluence. "
-                 "Jira i Confluence wymagają osobnych tokenów."),
-    Setting("JIRA_BASE_URL", "Adres Jiry", JIRA, placeholder="https://jira.example.com",
-            note="Buduje linki „…/browse/KEY” w interfejsie. Nie zmienia tego, do której Jiry pytają "
-                 "skille — ten adres jest zaszyty w redge_work poza tym repozytorium."),
-    Setting("JIRA_PROJECT_KEYS", "Klucze projektów", JIRA, placeholder="ABC, DEF",
-            note="Po przecinku. Pierwszy z nich jest podpowiedzią w edytorze dnia Tempo."),
-    Setting("TEMPO_USER", "Nazwa użytkownika w Tempo", JIRA, placeholder="imie.nazwisko",
-            note="Właściciel worklogów. Tempo nie ma osobnego tokenu — korzysta z PAT-a Jiry."),
+            note="No panel uses it yet; kept for skills that reach into Confluence. "
+                 "Jira and Confluence need separate tokens."),
+    Setting("JIRA_BASE_URL", "Jira address", JIRA, placeholder="https://jira.example.com",
+            note="Builds the “…/browse/KEY” links in this interface. It does not change which "
+                 "Jira the skills query — that host lives in redge_work, outside this repository."),
+    Setting("JIRA_PROJECT_KEYS", "Project keys", JIRA, placeholder="ABC, DEF",
+            note="Comma-separated. The first one is the placeholder in the Tempo day editor."),
+    Setting("TEMPO_USER", "Tempo username", JIRA, placeholder="first.last",
+            note="Whose worklogs. Tempo has no token of its own — it uses the Jira PAT."),
     Setting("WORK_HUB_PORT", "Port", HUB, placeholder="8787", restart=True,
-            note="Serwer słucha wyłącznie na pętli zwrotnej."),
-    Setting("WORK_HUB_PORANEK", "Przebieg poranny", HUB, placeholder="10:00", restart=True,
-            note="Godzina HH:MM."),
-    Setting("WORK_HUB_POPOLUDNIE", "Przebieg popołudniowy", HUB, placeholder="16:00", restart=True,
-            note="Godzina HH:MM."),
+            note="The server listens on the loopback interface only."),
+    Setting("WORK_HUB_MORNING", "Morning run", HUB, placeholder="10:00", restart=True,
+            note="Time as HH:MM."),
+    Setting("WORK_HUB_AFTERNOON", "Afternoon run", HUB, placeholder="16:00", restart=True,
+            note="Time as HH:MM."),
 )
 
 BY_KEY = {s.key: s for s in SETTINGS}
 GROUPS = (TOKENS, JIRA, HUB)
+
 
 def _secret_files():
     """Which file each token belongs in, asked of the library that reads them.
@@ -166,7 +167,7 @@ def save(values):
     tmp = ENV_PATH + ".tmp"
 
     with open(tmp, "w", encoding="utf-8") as handle:
-        handle.write("# work-hub — lokalna konfiguracja. Nigdy nie trafia do gita.\n" + body)
+        handle.write("# work-hub — local configuration. Never committed.\n" + body)
 
     os.chmod(tmp, 0o600)
     os.replace(tmp, ENV_PATH)
@@ -227,12 +228,12 @@ def _source(key, saved):
         return ".env"
 
     if os.environ.get(key):
-        return "środowisko"
+        return "environment"
 
     name = SECRET_FILES.get(key)
 
     if name and os.path.exists(os.path.join(SECRETS_DIR, name)):
-        return "plik"
+        return "file"
 
     return ""
 
@@ -273,7 +274,7 @@ def describe():
 
 def example():
     """`.env.example` — every key, no values, so the real file is never the template."""
-    lines = ["# work-hub — skopiuj do .env i uzupełnij. .env jest w .gitignore.", ""]
+    lines = ["# work-hub — copy to .env and fill in. .env is git-ignored.", ""]
 
     for group in GROUPS:
         lines.append("# --- %s ---" % group)

@@ -11,7 +11,7 @@ import time
 
 from redge_work import cache
 
-from . import DATA_DIR, sources
+from . import DATA_DIR, config, sources
 
 STATE = os.path.join(DATA_DIR, "schedule-state.json")
 TICK_SECONDS = 60
@@ -23,8 +23,12 @@ TARGETS = {
 
 
 def _override(group, default):
-    """WORK_HUB_PORANEK=10:00 / WORK_HUB_POPOLUDNIE=16:30 — handy for trying it out."""
-    raw = os.environ.get("WORK_HUB_%s" % group.upper())
+    """WORK_HUB_MORNING=10:00 / WORK_HUB_AFTERNOON=16:30, from `.env` or the environment.
+
+    Read once at start-up: the scheduler runs in this process, not as a subprocess, so a
+    change takes effect on the next restart rather than the next tick.
+    """
+    raw = config.get("WORK_HUB_%s" % group.upper())
 
     if not raw or ":" not in raw:
         return default

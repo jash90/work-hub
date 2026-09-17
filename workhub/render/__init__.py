@@ -28,14 +28,14 @@ def _safe(fn, payload, index=None):
     try:
         return fn(payload, index) if index is not None else fn(payload)
     except Exception as exc:
-        return '<div class="banner bad">Nie udało się wyrenderować panelu: %s</div>' % layout.esc(exc)
+        return '<div class="banner bad">Could not render the panel: %s</div>' % layout.esc(exc)
 
 
 def headline(panel_id, envelope):
     payload = (envelope or {}).get("payload")
 
     if payload is None:
-        return '<span class="muted">brak danych</span>'
+        return '<span class="muted">no data</span>'
 
     return _safe(RENDERERS[panel_id][1], payload)
 
@@ -44,7 +44,7 @@ def body(panel_id, envelope):
     payload = (envelope or {}).get("payload")
 
     if payload is None:
-        return layout.empty("Panel nie ma jeszcze danych — kliknij „Odśwież”.")
+        return layout.empty("This panel has no data yet — click “Refresh”.")
 
     index = links.build() if panel_id in NEEDS_MR_INDEX else None
 
@@ -68,7 +68,7 @@ def _card(panel):
   <footer>
     %s
     <span class="spacer"></span>
-    <button data-refresh="%s">Odśwież</button>
+    <button data-refresh="%s">Refresh</button>
   </footer>
 </article>""" % (panel.id, layout.state_of(envelope), panel.id, layout.esc(panel.label),
                  layout.esc(panel.blurb), headline(panel.id, envelope),
@@ -83,20 +83,20 @@ def overview(hub):
         groups.append('<section class="block"><h3>%s</h3><div class="grid">%s</div></section>'
                       % (layout.esc(sources.GROUP_LABELS[group]), cards))
 
-    schedule = " · ".join("%s: %s" % (s["label"], s["last_run"] or "jeszcze nie")
+    schedule = " · ".join("%s: %s" % (s["label"], s["last_run"] or "not yet")
                           for s in hub.scheduler.describe())
-    head = ('<div class="page-head"><h1>Przegląd</h1>'
-            '<p>Ostatnie automatyczne przebiegi — %s</p></div>') % layout.esc(schedule)
+    head = ('<div class="page-head"><h1>Overview</h1>'
+            '<p>The last automatic runs — %s</p></div>') % layout.esc(schedule)
 
     return layout.page("work-hub", "", head + "".join(groups), hub.csrf)
 
 
 def settings_page(hub):
     """Not a panel: it has no skill, no envelope and nothing for the scheduler to refresh."""
-    head = ('<div class="page-head"><h1>Ustawienia</h1>'
-            '<p>Tokeny i adresy, których używają skille uruchamiane przez hub.</p></div>')
+    head = ('<div class="page-head"><h1>Settings</h1>'
+            '<p>The tokens and addresses used by the skills the hub runs.</p></div>')
 
-    return layout.page("Ustawienia — work-hub", "settings", head + settings.page_body(), hub.csrf)
+    return layout.page("Settings — work-hub", "settings", head + settings.page_body(), hub.csrf)
 
 
 def panel_page(hub, panel_id):
@@ -109,7 +109,7 @@ def panel_page(hub, panel_id):
     %s
     <span class="spacer"></span>
     %s
-    <button data-refresh="%s">Odśwież</button>
+    <button data-refresh="%s">Refresh</button>
   </header>
   <div data-fragment>%s</div>
 </section>""" % (panel_id, layout.state_of(envelope), layout.esc(panel.label),

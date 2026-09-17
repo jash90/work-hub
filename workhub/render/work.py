@@ -1,17 +1,16 @@
-"""Panels answering „co mam do zrobienia": dashboard, priority, testing."""
-from redge_work.polish import days_ago_phrase, plural
-
+"""Panels answering "what have I got to do": dashboard, priority, testing."""
 from ..links import merge
+from ..text import count, days_ago
 from .layout import (BUCKET_LABELS, BUCKET_TONES, chip, empty, esc, link, mr_links, section,
                      table, ticket_link, when)
 
 REVIEW_LABELS = {
-    "waiting_for_me": "czeka na moją odpowiedź",
-    "ignored": "bez odzewu",
-    "no_reply": "świeże, bez odpowiedzi",
-    "fixed": "poprawione",
-    "answered": "odpowiedziano",
-    "resolved_by_me": "zamknięte przeze mnie",
+    "waiting_for_me": "waiting on my reply",
+    "ignored": "no response",
+    "no_reply": "fresh, no reply yet",
+    "fixed": "fixed",
+    "answered": "answered",
+    "resolved_by_me": "closed by me",
 }
 
 
@@ -45,7 +44,7 @@ def _mr_rows(mrs, min_approvals):
             marks.append(chip("draft", "wait"))
 
         if mr.get("unresolved"):
-            marks.append(chip("%s" % plural(mr["unresolved"], "wątek", "wątki", "wątków"), "wait"))
+            marks.append(chip(count(mr["unresolved"], "thread"), "wait"))
 
         out.append([
             link(mr.get("web_url"), "!%s" % mr.get("iid"), mono=True),
@@ -69,7 +68,7 @@ def _review_rows(threads):
             '<span class="repo">%s</span>' % esc(thread.get("repo")),
             '<span class="key">%s</span>' % esc(where),
             '<span class="summary">%s</span>' % esc((thread.get("excerpt") or "")[:220]),
-            '<span class="muted">%s</span>' % esc("od %s" % days_ago_phrase(waited) if waited is not None else ""),
+            '<span class="muted">%s</span>' % esc(days_ago(waited) if waited is not None else ""),
         ])
 
     return out
@@ -81,22 +80,22 @@ def dashboard_body(payload, index=None):
 
     tasks = data.get("tasks") or []
     blocks.append(section(
-        "Do zrobienia", table(["Ticket", "Status", "Wydanie", "Temat", "MR"], _task_rows(tasks, index))
-        or empty("Nic nie czeka na start."),
+        "To do", table(["Ticket", "Status", "Release", "Summary", "MR"], _task_rows(tasks, index))
+        or empty("Nothing waiting to be started."),
         chip(str(len(tasks)))))
 
     ready = data.get("ready") or []
     blocks.append(section(
-        "Gotowe do mergu",
-        table(["MR", "Repo", "Tytuł", "Stan", "Blokady"], _mr_rows(ready, data.get("min_approvals", 2)))
-        or empty("Żaden z moich MR-ów nie zebrał jeszcze kompletu approve."),
+        "Ready to merge",
+        table(["MR", "Repo", "Title", "State", "Blockers"], _mr_rows(ready, data.get("min_approvals", 2)))
+        or empty("None of my MRs has a full set of approvals yet."),
         chip(str(len(ready)), "ok" if ready else "")))
 
     others = data.get("other_mrs") or []
     blocks.append(section(
-        "Pozostałe moje MR-y",
-        table(["MR", "Repo", "Tytuł", "Stan", "Blokady"], _mr_rows(others, data.get("min_approvals", 2)))
-        or empty("Brak innych otwartych MR-ów."),
+        "My other MRs",
+        table(["MR", "Repo", "Title", "State", "Blockers"], _mr_rows(others, data.get("min_approvals", 2)))
+        or empty("No other open MRs."),
         chip(str(len(others)))))
 
     review = data.get("review") or {}
@@ -112,23 +111,22 @@ def dashboard_body(payload, index=None):
         stuck = [t for t in threads if t.get("kind") in ("ignored", "no_reply")]
 
         body = ['<p class="headline">%s</p>' % marks]
-        body.append(section("Czekają na mnie", table(
-            ["MR", "Repo", "Miejsce", "Treść", "Czeka"], _review_rows(mine)) or empty("Nic."), ""))
-        body.append(section("Czekają na autora", table(
-            ["MR", "Repo", "Miejsce", "Treść", "Czeka"], _review_rows(stuck[:20])) or empty("Nic."), ""))
+        body.append(section("Waiting on me", table(
+            ["MR", "Repo", "Where", "Comment", "Waiting"], _review_rows(mine)) or empty("Nothing."), ""))
+        body.append(section("Waiting on the author", table(
+            ["MR", "Repo", "Where", "Comment", "Waiting"], _review_rows(stuck[:20])) or empty("Nothing."), ""))
 
         blocks.append(section(
-            "Moje uwagi w cudzych MR-ach", "".join(body),
-            chip("%d w %s" % (summary.get("total", 0),
-                              plural(summary.get("mrs", 0), "MR-ze", "MR-ach", "MR-ach")))))
+            "My comments on other people's MRs", "".join(body),
+            chip("%d across %s" % (summary.get("total", 0), count(summary.get("mrs", 0), "MR")))))
 
     drift = data.get("drift") or []
 
     if drift:
         rows = [[link(d.get("url"), d.get("label"), mono=True), chip(d.get("status") or "—"),
                  '<span class="summary">%s</span>' % esc(d.get("detail"))] for d in drift]
-        blocks.append(section("Rozjazd Jira ↔ GitLab",
-                              table(["Ticket", "Status", "Co zrobić"], rows), chip(str(len(drift)), "wait")))
+        blocks.append(section("Jira ↔ GitLab drift",
+                              table(["Ticket", "Status", "What to do"], rows), chip(str(len(drift)), "wait")))
 
     return "".join(blocks)
 
@@ -138,10 +136,10 @@ def dashboard_headline(payload):
     review = (data.get("review") or {}).get("summary") or {}
 
     return " ".join([
-        chip("%s do zrobienia" % plural(len(data.get("tasks") or []), "task", "taski", "tasków")),
-        chip("%s do mergu" % plural(len(data.get("ready") or []), "MR gotowy", "MR-y gotowe", "MR-ów gotowych"),
+        chip("%s to do" % count(len(data.get("tasks") or []), "task")),
+        chip("%s ready to merge" % count(len(data.get("ready") or []), "MR"),
              "ok" if data.get("ready") else ""),
-        chip("%s u mnie" % plural(review.get("on_me", 0), "uwaga", "uwagi", "uwag"),
+        chip("%s on me" % count(review.get("on_me", 0), "comment"),
              "wait" if review.get("on_me") else ""),
     ])
 
@@ -154,19 +152,19 @@ def priority_body(payload, index=None):
     for bucket in sorted({i.get("bucket", 3) for i in issues}):
         rows = [i for i in issues if i.get("bucket", 3) == bucket]
         blocks.append(section(
-            BUCKET_LABELS.get(bucket, "Inne"),
-            table(["Ticket", "Status", "Wydanie", "Temat", "MR"], _task_rows(rows, index)),
+            BUCKET_LABELS.get(bucket, "Other"),
+            table(["Ticket", "Status", "Release", "Summary", "MR"], _task_rows(rows, index)),
             chip(str(len(rows)), BUCKET_TONES.get(bucket, ""))))
 
-    return "".join(blocks) or empty("Brak nierozwiązanych tasków.")
+    return "".join(blocks) or empty("No unresolved tasks.")
 
 
 def priority_headline(payload):
     issues = payload["main"].get("issues") or []
     overdue = len([i for i in issues if i.get("bucket") == 0])
 
-    return " ".join([chip(plural(len(issues), "task", "taski", "tasków")),
-                     chip("%d po terminie" % overdue, "bad" if overdue else "")])
+    return " ".join([chip(count(len(issues), "task")),
+                     chip("%d overdue" % overdue, "bad" if overdue else "")])
 
 
 def _queried_status(payload):
@@ -191,13 +189,13 @@ def testing_body(payload, index=None):
                  '<span class="summary">%s</span>' % esc(i.get("summary")),
                  mr_links(index.get(i["key"]))] for i in items]
 
-    headers = ["Ticket", "Status", "Przypisany", "Temat", "MR"]
+    headers = ["Ticket", "Status", "Assignee", "Summary", "MR"]
 
     return "".join([
-        section("Nadal w „%s”" % status, table(headers, rows(still))
-                or empty("Nic nie czeka."), chip(str(len(still)), "wait" if still else "")),
-        section("Poszły dalej", table(headers, rows(moved[:40]))
-                or empty("Nic."), chip(str(len(moved)), "ok")),
+        section("Still in “%s”" % status, table(headers, rows(still))
+                or empty("Nothing waiting."), chip(str(len(still)), "wait" if still else "")),
+        section("Moved on", table(headers, rows(moved[:40]))
+                or empty("Nothing."), chip(str(len(moved)), "ok")),
     ])
 
 
@@ -207,5 +205,5 @@ def testing_headline(payload):
     issues = data.get("issues") or []
     still = len([i for i in issues if i.get("status") == status])
 
-    return " ".join([chip("%s do testów" % plural(len(issues), "ticket", "tickety", "ticketów")),
-                     chip("%d nadal w testach" % still, "wait" if still else "ok")])
+    return " ".join([chip("%s in testing" % count(len(issues), "ticket")),
+                     chip("%d still there" % still, "wait" if still else "ok")])
