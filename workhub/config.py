@@ -61,9 +61,27 @@ SETTINGS = (
 BY_KEY = {s.key: s for s in SETTINGS}
 GROUPS = (TOKENS, JIRA, HUB)
 
-# Where a token lands for the skills that read a file rather than the environment.
-SECRET_FILES = {"JIRA_TOKEN": "jira-token", "GITLAB_TOKEN": "gitlab-token",
-                "CONFLUENCE_TOKEN": "confluence-token"}
+def _secret_files():
+    """Which file each token belongs in, asked of the library that reads them.
+
+    redge_work owns those paths, so naming them again here would be a second copy free to
+    drift — and the hub would be asserting a filename it does not control.
+    """
+    names = {"JIRA_TOKEN": "jira-token", "GITLAB_TOKEN": "gitlab-token",
+             "CONFLUENCE_TOKEN": "confluence-token"}
+
+    try:
+        from redge_work import gitlab, jira
+
+        names["JIRA_TOKEN"] = os.path.basename(jira.TOKEN_PATH)
+        names["GITLAB_TOKEN"] = os.path.basename(gitlab.TOKEN_PATH)
+    except (ImportError, AttributeError):
+        pass
+
+    return names
+
+
+SECRET_FILES = _secret_files()
 
 DEFAULTS = {"JIRA_BASE_URL": "", "JIRA_PROJECT_KEYS": ""}
 

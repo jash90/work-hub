@@ -188,4 +188,5 @@ class Guards(unittest.TestCase):
         self.call("/api/settings", "POST", {"values": {"GITLAB_TOKEN": "bez-synchronizacji"}},
                   {"X-CSRF": self.csrf})
 
-        self.assertFalse(os.path.exists(os.path.join(config.SECRETS_DIR, "gitlab-token")))
+        self.assertFalse(os.path.exists(os.path.join(config.SECRETS_DIR,
+                                                  config.SECRET_FILES["GITLAB_TOKEN"])))
