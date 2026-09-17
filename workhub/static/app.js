@@ -410,6 +410,71 @@ function bindWeeks(root) {
   }
 }
 
+/* ---------- release board: folding ---------- */
+
+// A release finished for me starts folded, but an explicit choice outranks that rule in both
+// directions and survives a reload. Only explicit choices are stored, so a release that later
+// finishes still folds itself, and one that reopens still unfolds.
+const FOLD_KEY = 'work-hub-folded-releases';
+
+function readFolds() {
+  try {
+    return JSON.parse(localStorage.getItem(FOLD_KEY) || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+
+function writeFolds(folds) {
+  try {
+    localStorage.setItem(FOLD_KEY, JSON.stringify(folds));
+  } catch (e) { /* private window — folding just won't be remembered */ }
+}
+
+function applyFold(section, folded) {
+  const toggle = section.querySelector('[data-release-fold]');
+
+  section.dataset.folded = folded ? 'yes' : 'no';
+  toggle.setAttribute('aria-expanded', String(!folded));
+  toggle.textContent = folded ? '▸' : '▾';
+}
+
+function bindReleases(root) {
+  const sections = [...root.querySelectorAll('.release[data-release]')];
+
+  if (!sections.length) return;
+
+  const folds = readFolds();
+
+  const remember = (name, folded) => {
+    folds[name] = folded;
+    writeFolds(folds);
+  };
+
+  for (const section of sections) {
+    const name = section.dataset.release;
+    const chosen = folds[name];
+    applyFold(section, chosen === undefined ? 'finished' in section.dataset : chosen);
+
+    section.querySelector('[data-release-fold]').onclick = () => {
+      const folded = section.dataset.folded !== 'yes';
+      applyFold(section, folded);
+      remember(name, folded);
+    };
+  }
+
+  for (const button of root.querySelectorAll('[data-fold-all]')) {
+    button.onclick = () => {
+      const folded = button.dataset.foldAll === 'yes';
+
+      for (const section of sections) {
+        applyFold(section, folded);
+        remember(section.dataset.release, folded);
+      }
+    };
+  }
+}
+
 /* ---------- picking merge requests out of the review queue ---------- */
 
 async function toClipboard(text) {
@@ -539,6 +604,7 @@ function bind(root) {
   bindWeeks(root);
   bindPicker(root);
   bindSettings(root);
+  bindReleases(root);
 }
 
 /* ---------- sidebar (only collapsible on a narrow screen) ---------- */

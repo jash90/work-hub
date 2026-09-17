@@ -265,3 +265,55 @@ class ReleaseWarnings(unittest.TestCase):
         html = releases.body({"main": {"issues": [], "mrs": {}}})
 
         self.assertNotIn("banner warn", html)
+
+class ReleaseFolding(unittest.TestCase):
+    """Which releases fold themselves. The rule reads my own tasks, not the release total."""
+
+    def issue(self, key, progress, mine=True, release="R 1.0"):
+        return {"key": key, "progress": progress, "mine": mine, "release_name": release,
+                "status": "Rejected" if progress == "closed" else "Code review", "summary": ""}
+
+    def test_a_release_where_all_my_tasks_are_closed_is_finished(self):
+        items = [self.issue("ABC-1", "closed"), self.issue("ABC-2", "closed")]
+
+        self.assertEqual("every task closed", releases.finished_reason(items))
+
+    def test_one_open_task_of_mine_keeps_the_release_alive(self):
+        items = [self.issue("ABC-1", "closed"), self.issue("ABC-2", "review")]
+
+        self.assertEqual("", releases.finished_reason(items))
+
+    def test_the_team_still_working_does_not_keep_it_open_for_me(self):
+        """My one rejected ticket ends the release for me even with the team still on it."""
+        items = [self.issue("ABC-1", "closed"),
+                 self.issue("DEF-9", "review", mine=False),
+                 self.issue("DEF-8", "qa", mine=False)]
+
+        self.assertIn("2 tasks still open for the team", releases.finished_reason(items))
+
+    def test_a_release_i_have_no_task_in_is_never_finished(self):
+        items = [self.issue("DEF-9", "closed", mine=False)]
+
+        self.assertEqual("", releases.finished_reason(items))
+
+    def test_a_finished_release_is_marked_for_the_browser_to_fold(self):
+        payload = {"main": {"mrs": {}, "issues": [
+            self.issue("ABC-1", "closed", release="Old 1.0"),
+            self.issue("ABC-2", "review", release="Live 2.0"),
+        ]}}
+        html = releases.body(payload)
+
+        self.assertIn('data-release="Old 1.0" data-finished=', html)
+        self.assertIn('data-release="Live 2.0">', html)
+
+    def test_the_bar_counts_what_was_folded(self):
+        payload = {"main": {"mrs": {}, "issues": [self.issue("ABC-1", "closed")]}}
+
+        self.assertIn("1 release folded as finished", releases.body(payload))
+
+    def test_every_release_can_be_folded_by_hand(self):
+        payload = {"main": {"mrs": {}, "issues": [self.issue("ABC-2", "review")]}}
+        html = releases.body(payload)
+
+        self.assertIn("data-release-fold", html)
+        self.assertIn('data-fold-all="yes"', html)

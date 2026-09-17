@@ -177,6 +177,24 @@ the scrim or a link, because a fixed rail would eat a phone screen; above it, it
 part of the layout. The header carries the current panel's name, the theme toggle and the
 global refresh.
 
+### Folding releases
+
+Every release on the board folds by clicking its header, and the choice is remembered per
+browser. A release that is **finished for me** starts folded and says why in its header —
+either `every task closed` or `my tasks closed · N tasks still open for the team`.
+
+"Finished" is decided on my own tasks, not the release total, and reads the skill's own
+`progress` bucket rather than matching status names, so `Done` and `Rejected` count alike.
+The distinction matters: a release where my one ticket was rejected is over for me even
+with twenty of the team's still open, while a single open task of mine keeps it unfolded no
+matter how much is closed around it. A release I have no task in is never called finished —
+there is no work of mine to be done with.
+
+An explicit fold or unfold outranks the rule in both directions and survives a reload. Only
+explicit choices are stored, so a release that finishes later still folds itself, and one
+that reopens still unfolds. Folding hides a release's tasks, never the release: the header
+stays, or hiding would become losing.
+
 ### Picking merge requests out of the queue
 
 Rows in the review queue carry a checkbox. Pick several, hit **Skopiuj linki** and their

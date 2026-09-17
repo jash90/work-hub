@@ -711,3 +711,17 @@ input.hours { -moz-appearance: textfield; }
   border-top: 1px solid hsl(var(--border));
 }
 .settings-actions .muted { font-size: 12px; }
+
+/* ---------- release board ---------- */
+
+.release-bar { display: flex; align-items: center; gap: 12px; margin-bottom: -8px; }
+.release-bar .muted { font-size: 12px; }
+
+.release h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.release-name { font-weight: 600; }
+.release-fold { padding: 0 7px; height: 24px; font-size: 11px; line-height: 1; }
+.release[data-folded="yes"] .release-body { display: none; }
+/* A folded release keeps its header: it has to stay reachable, or hiding becomes losing. */
+.release[data-folded="yes"] h3 { margin-bottom: 0; }
+.release[data-finished] .release-name { color: hsl(var(--muted-foreground)); }
+.finished-why { font-size: 12px; }
