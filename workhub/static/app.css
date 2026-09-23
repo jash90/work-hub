@@ -220,6 +220,45 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 .content { margin-left: var(--rail); min-width: 0; }
 
+/* The overtime figure closes the rail. It is a number, not a destination, so it borrows the
+   nav's spacing but none of its link styling. */
+.rail-figure[hidden] { display: none; }
+
+.rail-total {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 11px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+}
+
+.rail-total:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+.rail-total strong { margin-left: auto; font-size: 13px; color: hsl(var(--foreground)); }
+.rail-total .caret { font-size: 10px; }
+
+.rail-months { margin: 2px 0 0; padding: 0; list-style: none; }
+
+.rail-months li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 11px;
+  font-size: 12.5px;
+  color: hsl(var(--muted-foreground));
+}
+
+.rail-figure[data-open="no"] .rail-months { display: none; }
+
 .crumb {
   margin: 0;
   font-size: 14px;

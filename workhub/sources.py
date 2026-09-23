@@ -43,6 +43,13 @@ def month_weeks():
             last + datetime.timedelta(6 - last.weekday()))
 
 
+def year_to_date():
+    """1 January to today — the span the overtime figure in the rail is summed over."""
+    today = datetime.date.today()
+
+    return (today.replace(month=1, day=1), today)
+
+
 class Command:
     """One subprocess. `argv` may be a callable when an argument depends on today's date.
 
@@ -134,6 +141,12 @@ PANELS = (
             Command("worklogs", lambda: [PY3, skill("tempo-fill", "tempo.py"), "worklogs",
                                          "--from", month_weeks()[0].isoformat(),
                                          "--to", month_weeks()[1].isoformat(), "--json"]),
+            # The same command over the whole year: one HTTP call, and the only thing the
+            # overtime figure in the rail reads. It is a fourth command rather than a panel
+            # of its own because the rail is not navigation — there is nothing to open.
+            Command("year", lambda: [PY3, skill("tempo-fill", "tempo.py"), "worklogs",
+                                     "--from", year_to_date()[0].isoformat(),
+                                     "--to", year_to_date()[1].isoformat(), "--json"]),
         ],
     ),
     Panel(

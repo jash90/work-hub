@@ -23,6 +23,9 @@ DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ENTRY = r"(?:\d+:)?[A-Z][A-Z0-9]*-\d+=\d+(?:\.\d+)?"
 ENTRIES = re.compile(r"^%s(?:,%s)*$" % (ENTRY, ENTRY))
 TIMEOUT = 120
+# The skill's own definition of a full day. It lives here rather than in a renderer because
+# two screens now measure against it: the day editor and the overtime figure in the rail.
+TARGET_HOURS = 8.0
 
 
 def is_day(value):

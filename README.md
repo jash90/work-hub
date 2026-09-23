@@ -195,6 +195,37 @@ explicit choices are stored, so a release that finishes later still folds itself
 that reopens still unfolds. Folding hides a release's tasks, never the release: the header
 stays, or hiding would become losing.
 
+### Overtime in the rail
+
+The rail closes with the overtime logged so far this year — one total, and the months it came
+from. It is part of the shell, so the number is on screen whatever panel is open; clicking it
+folds the month list away, and that choice is remembered per browser.
+
+**It counts in one direction only.** A day above eight hours contributes its surplus, a day
+below them contributes nothing, and a weekend or a public holiday contributes everything
+logged on it. A short Tuesday is not a debt the following Thursday pays off: the figure
+answers *how much did I work beyond the norm*, which is a different question from *did I make
+my hours* and has a different answer in every month holding both kinds of day. The total can
+therefore never go negative.
+
+Which days are days off is not decided here. The skill marks every day it returns with
+`workday`, so the hub holds no calendar and knows no Polish holiday — it multiplies and adds,
+exactly as the week totals in the Tempo panel already do.
+
+The data is a fourth command on the **tempo** panel rather than a panel of its own: a rail is
+not navigation, there is nothing to open. It asks the same script for the whole year in a
+single HTTP call — some three seconds onto a panel run that already takes between fifteen and
+forty of them — and refreshes with Tempo, on the 16:00 run and the panel's own button. The
+price of sharing a panel is shared failure: if the year query times out, the week editor's
+refresh is lost with it and Tempo falls back to its stale banner. Same host, same token, same
+VPN, so in practice they fail together or not at all.
+
+Two things it does not do. It **does not filter by ticket**: an hour booked on an absence or
+an administrative key is an hour that was logged, and quietly dropping some would answer a
+question nobody asked — a nine-hour day on an admin ticket reads as one hour of overtime,
+because that is what it is. And it is only as good as Tempo: duplicate worklogs, which Tempo
+does generate, inflate a day and the figure with it.
+
 ### Picking merge requests out of the queue
 
 Rows in the review queue carry a checkbox. Pick several, hit **Skopiuj linki** and their

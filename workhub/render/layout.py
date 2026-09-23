@@ -4,7 +4,7 @@ import html
 import re
 import time
 
-from .. import config, sources
+from .. import config, overtime, sources
 from ..text import count, days
 
 
@@ -14,6 +14,26 @@ def esc(value):
 
 def chip(text, tone=""):
     return '<span class="chip %s">%s</span>' % (tone, esc(text))
+
+
+MONTHS = ("January", "February", "March", "April", "May", "June", "July",
+          "August", "September", "October", "November", "December")
+
+
+def hours(value):
+    """Hours as they read on screen: 8, 2.25, 7.75 — never 8.0 and never 2.2500000001."""
+    return "%g" % round(value, 2)
+
+
+def month_name(month):
+    """A month key as a name: 2026-09 is September.
+
+    The year is said once, above the list, rather than on every row of a narrow rail.
+    """
+    try:
+        return MONTHS[int(month[5:7]) - 1]
+    except (ValueError, IndexError):
+        return month
 
 
 def ago(seconds):
@@ -109,6 +129,48 @@ def state_of(envelope):
     return "stale" if envelope.get("error") else "ok"
 
 
+def rail_data():
+    """The overtime figure with its months named, for the rail and for the poll behind it.
+
+    /api/state carries this so a refresh can bring the rail up to date without a reload. The
+    month names are attached here rather than in the browser: the rail already spells them
+    out server-side, and a second list of twelve of them in JavaScript would be a copy free
+    to drift from this one.
+    """
+    figure = overtime.summary()
+
+    return dict(figure, months=[dict(month, label=month_name(month["month"]))
+                                for month in figure["months"]])
+
+
+def rail_figure():
+    """Overtime so far this year: the total, and the months it came from.
+
+    A figure, not navigation — hence a button and not a link. Every anchor in this rail is
+    styled as a nav item, closes the drawer when tapped and counts as one more way into a
+    panel, and none of that is true of a number.
+
+    The block is rendered even with nothing in it, merely hidden, so the first Tempo run of
+    a fresh hub can reveal it in place instead of waiting for the next page load.
+    """
+    figure = rail_data()
+    rows = "".join(
+        '<li><span>%s</span><span class="num">+%s h</span></li>'
+        % (esc(month["label"]), esc(hours(month["hours"])))
+        for month in figure["months"])
+
+    return """<div class="nav-group nav-foot rail-figure" data-overtime-figure data-open="yes"%s>
+      <button type="button" class="rail-total" data-overtime-fold aria-expanded="true">
+        <span data-overtime-label>%s</span>
+        <strong class="num" data-overtime-total>+%s h</strong>
+        <span class="caret">▾</span>
+      </button>
+      <ul class="rail-months" data-overtime-months>%s</ul>
+    </div>""" % ("" if figure["months"] else " hidden",
+                 esc(("Overtime %s" % figure["year"]).strip()),
+                 esc(hours(figure["total"])), rows)
+
+
 def sidebar(active):
     """Permanent left rail, grouped the same way the overview is.
 
@@ -134,9 +196,10 @@ def sidebar(active):
     <a href="/" class="%s">Overview</a>
     %s
     <div class="nav-group nav-foot"><a href="/settings" class="%s">Settings</a></div>
+    %s
   </nav>
 </aside>""" % ("on" if active == "" else "", "".join(sections),
-               "on" if active == "settings" else "")
+               "on" if active == "settings" else "", rail_figure())
 
 
 # Applied before first paint so a dark theme never flashes white on load.

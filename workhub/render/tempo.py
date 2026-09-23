@@ -11,23 +11,16 @@ total, a worklog id that is really there) remain the skill's.
 import datetime
 
 from .. import config
+from ..tempo import TARGET_HOURS
 from ..text import count
-from .layout import chip, empty, esc, section, table, ticket_link
+from .layout import MONTHS, chip, empty, esc, hours, section, table, ticket_link
 
 QUARTER = 0.25
-TARGET_HOURS = 8.0
 
 WEEKDAYS = {"Mon": "Monday", "Tue": "Tuesday", "Wed": "Wednesday", "Thu": "Thursday",
             "Fri": "Friday", "Sat": "Saturday", "Sun": "Sunday"}
 
-MONTHS = ("January", "February", "March", "April", "May", "June", "July",
-          "August", "September", "October", "November", "December")
-
 ENDPOINTS = {"propose": "/api/tempo/log", "logged": "/api/tempo/replace"}
-
-
-def _hours(value):
-    return ("%g" % round(value, 2))
 
 
 def _key_hint():
@@ -69,7 +62,7 @@ def _entry_row(entry):
         '<span class="summary">%s</span>' % esc((entry.get("summary") or "")[:90]),
         '<span class="muted">%s</span>' % esc(count(commits, "commit"))
         if commits is not None else "",
-        esc(_hours(entry.get("hours", 0))),
+        esc(hours(entry.get("hours", 0))),
         esc(entry["key"]),
     )
 
@@ -121,7 +114,7 @@ def _day(day, mode):
 </article>""" % (
         esc(day["day"]), TARGET_HOURS, ENDPOINTS[mode],
         esc(_date(day["day"])), esc(weekday), esc(day["day"]),
-        esc(_hours(day.get("total_hours", 0))), esc(day["day"]),
+        esc(hours(day.get("total_hours", 0))), esc(day["day"]),
         "Save changes" if mode == "logged" else "Log the day",
         trailing,
         "".join(_entry_row(e) for e in entries),
@@ -134,7 +127,7 @@ def _rest_day(day):
     weekday = WEEKDAYS.get(day.get("weekday"), day.get("weekday") or "")
     entries = day.get("entries") or []
     listing = "".join(
-        '<li>%s <span class="muted">%s h</span></li>' % (esc(e["key"]), esc(_hours(e.get("hours", 0))))
+        '<li>%s <span class="muted">%s h</span></li>' % (esc(e["key"]), esc(hours(e.get("hours", 0))))
         for e in entries)
 
     return """<article class="day rest">
@@ -145,7 +138,7 @@ def _rest_day(day):
   </header>%s
 </article>""" % (
         esc(_date(day["day"])), esc(weekday),
-        "%s h — a day off, edit it in Tempo" % esc(_hours(day.get("total_hours", 0)))
+        "%s h — a day off, edit it in Tempo" % esc(hours(day.get("total_hours", 0)))
         if entries else "day off",
         '<ul class="rest-entries">%s</ul>' % listing if entries else "",
     )
@@ -195,7 +188,7 @@ def _week(days, index, active):
     return """<section class="week" data-week="%d" data-label="%s" data-total="%s h / %s h"%s>%s</section>""" % (
         index,
         esc("%s – %s" % (_date(days[0][0]["day"]), _date(days[-1][0]["day"]))),
-        esc(_hours(logged)), esc(_hours(target)),
+        esc(hours(logged)), esc(hours(target)),
         "" if index == active else " hidden",
         cards,
     )
@@ -260,5 +253,5 @@ def headline(payload):
 
     return " ".join([chip("%s to log" % count(len(plan), "day"),
                           "wait" if plan else "ok"),
-                     chip("%s h in Tempo" % _hours(logged) if days
-                          else "%s h" % _hours(sum(d.get("total_hours", 0) for d in plan)))])
+                     chip("%s h in Tempo" % hours(logged) if days
+                          else "%s h" % hours(sum(d.get("total_hours", 0) for d in plan)))])

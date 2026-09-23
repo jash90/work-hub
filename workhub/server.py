@@ -172,7 +172,11 @@ class Handler(BaseHTTPRequestHandler):
                 "error": envelope.get("error"),
             })
 
-        return {"panels": panels, "schedule": self.hub.scheduler.describe()}
+        # The rail sits outside every [data-fragment], so a refresh would leave its overtime
+        # figure showing the previous total until the next page load. This poll already runs
+        # while a panel refreshes; carrying the figure on it costs no extra request.
+        return {"panels": panels, "schedule": self.hub.scheduler.describe(),
+                "overtime": render.layout.rail_data()}
 
     def _refresh(self, body):
         if body.get("all"):

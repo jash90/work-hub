@@ -1,7 +1,8 @@
+import os
 import unittest
 
 from . import context  # noqa: F401
-from workhub import render
+from workhub import overtime, render, store
 from workhub.render import layout, releases
 
 DASHBOARD = {"main": {
@@ -317,3 +318,58 @@ class ReleaseFolding(unittest.TestCase):
 
         self.assertIn("data-release-fold", html)
         self.assertIn('data-fold-all="yes"', html)
+
+
+class OvertimeInTheRail(unittest.TestCase):
+    """The figure closing the rail. It is rendered by the shell, which has no render._safe."""
+
+    def tearDown(self):
+        overtime._cache.update(stamp=None, value=None)
+
+        try:
+            os.remove(store.path("tempo"))
+        except OSError:
+            pass
+
+    def seed(self, days):
+        store.record_success("tempo", {"year": {"from": "2026-01-01", "days": days}}, 10, now=1000)
+        overtime._cache.update(stamp=None, value=None)
+
+    def test_it_shows_the_total_and_the_months_it_came_from(self):
+        self.seed([{"day": "2026-09-16", "workday": True, "total_hours": 11},
+                   {"day": "2026-08-12", "workday": True, "total_hours": 10}])
+
+        html = layout.sidebar("tempo")
+
+        self.assertIn("Overtime 2026", html)
+        self.assertIn("+5 h", html)
+        self.assertIn("<span>September</span>", html)
+        self.assertIn("<span>August</span>", html)
+
+    def test_with_nothing_to_show_the_block_is_hidden_not_absent(self):
+        """A hidden block can be revealed by the first Tempo run; a missing one needs a reload."""
+        html = layout.sidebar("")
+
+        self.assertIn("data-overtime-figure", html)
+        self.assertIn('data-open="yes" hidden', html)
+
+    def test_the_figure_is_not_a_link(self):
+        """Every anchor in this rail is a nav item: styled as one, and closing the drawer."""
+        self.seed([{"day": "2026-09-16", "workday": True, "total_hours": 11}])
+
+        figure = layout.sidebar("").split('class="nav-group nav-foot rail-figure"')[1]
+
+        self.assertNotIn("<a ", figure)
+
+    def test_the_rail_hook_is_not_the_day_editor_checkbox(self):
+        """repaint() binds fragments, so a selector both answer to made the checkbox the figure."""
+        from workhub.render import tempo
+
+        self.assertNotIn("data-overtime-figure", tempo.body(TEMPO))
+
+    def test_a_nonsense_payload_still_leaves_a_usable_page(self):
+        store.record_success("tempo", {"year": "garbage"}, 10, now=1000)
+        overtime._cache.update(stamp=None, value=None)
+
+        self.assertIn('href="/settings"', layout.sidebar("settings"))
+

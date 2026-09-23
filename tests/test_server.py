@@ -130,6 +130,12 @@ class Guards(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertEqual(len(sources.PANELS), len(json.loads(body)["panels"]))
 
+    def test_state_carries_the_overtime_figure_for_the_rail(self):
+        """The rail is outside every fragment, so the poll is what keeps its number honest."""
+        figure = json.loads(self.call("/api/state")[1])["overtime"]
+
+        self.assertEqual({"total", "months", "year"}, set(figure))
+
     def test_unknown_panel_is_a_404(self):
         self.assertEqual(404, self.call("/p/nie-ma")[0])
         self.assertEqual(404, self.call("/api/nie-ma")[0])

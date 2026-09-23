@@ -110,6 +110,8 @@ async function follow(ids) {
 
       if (document.querySelector('.grid')) refreshedCards = true;
     }
+
+    paintOvertime(now.overtime);
   }
 
   if (refreshedCards) window.location.reload();
@@ -605,6 +607,68 @@ function bind(root) {
   bindPicker(root);
   bindSettings(root);
   bindReleases(root);
+  bindOvertime(root);
+}
+
+/* ---------- overtime figure in the rail ---------- */
+
+// Only an explicit choice is stored, as with the release folds: the block starts open, and a
+// browser that was never told otherwise keeps it open.
+const OVERTIME_KEY = 'work-hub-overtime-open';
+
+function readOvertimeOpen() {
+  try {
+    return localStorage.getItem(OVERTIME_KEY) !== 'no';
+  } catch (e) {
+    return true;
+  }
+}
+
+function writeOvertimeOpen(open) {
+  try {
+    localStorage.setItem(OVERTIME_KEY, open ? 'yes' : 'no');
+  } catch (e) { /* private window — the choice just won't be remembered */ }
+}
+
+function applyOvertimeOpen(figure, open) {
+  const toggle = figure.querySelector('[data-overtime-fold]');
+
+  figure.dataset.open = open ? 'yes' : 'no';
+  toggle.setAttribute('aria-expanded', String(open));
+  toggle.querySelector('.caret').textContent = open ? '▾' : '▸';
+}
+
+// The hook is spelled out in full: the Tempo day editor already carries a [data-overtime]
+// checkbox, and repaint() binds fragments, so a shorter name matched the wrong element.
+function bindOvertime(root) {
+  const figure = root.querySelector('[data-overtime-figure]');
+
+  if (!figure) return;
+
+  applyOvertimeOpen(figure, readOvertimeOpen());
+
+  figure.querySelector('[data-overtime-fold]').addEventListener('click', () => {
+    const open = figure.dataset.open !== 'yes';
+
+    applyOvertimeOpen(figure, open);
+    writeOvertimeOpen(open);
+  });
+}
+
+// The rail lives outside every [data-fragment], so repaint() never reaches it. Only the
+// numbers are swapped here: the container and its button stay, and with them the fold state
+// and the click handler bound to it once at load.
+function paintOvertime(data) {
+  const figure = document.querySelector('[data-overtime-figure]');
+
+  if (!figure || !data) return;
+
+  figure.hidden = !data.months.length;
+  figure.querySelector('[data-overtime-label]').textContent = `Overtime ${data.year}`.trim();
+  figure.querySelector('[data-overtime-total]').textContent = `+${data.total} h`;
+  figure.querySelector('[data-overtime-months]').innerHTML = data.months
+    .map((month) => `<li><span>${month.label}</span><span class="num">+${month.hours} h</span></li>`)
+    .join('');
 }
 
 /* ---------- sidebar (only collapsible on a narrow screen) ---------- */
