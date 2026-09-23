@@ -114,7 +114,9 @@ async function follow(ids) {
     paintOvertime(now.overtime);
   }
 
-  if (refreshedCards) window.location.reload();
+  if (refreshedCards) return window.location.reload();
+
+  document.querySelector('[data-refresh-all]')?.removeAttribute('aria-busy');
 }
 
 document.addEventListener('click', async (event) => {

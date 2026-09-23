@@ -75,20 +75,27 @@ class Runner:
     def __init__(self):
         self._locks = {p.id: threading.Lock() for p in sources.PANELS}
         self._running = set()
+        self._queued = set()
         self._guard = threading.Lock()
 
-    def is_running(self, panel_id):
+    def queue(self, panel_ids):
         with self._guard:
-            return panel_id in self._running
+            self._queued.update(panel_ids)
+
+    def is_running(self, panel_id):
+        return panel_id in self.running()
 
     def running(self):
         with self._guard:
-            return set(self._running)
+            return self._running | self._queued
 
     def run_panel(self, panel_id):
         """Run one panel. Returns its envelope, or None when a run was already in flight."""
         panel = sources.BY_ID[panel_id]
         lock = self._locks[panel_id]
+
+        with self._guard:
+            self._queued.discard(panel_id)
 
         if not lock.acquire(blocking=False):
             return None

@@ -189,6 +189,7 @@ class Handler(BaseHTTPRequestHandler):
 
             targets = [panel_id]
 
+        self.hub.runner.queue(targets)
         threading.Thread(target=self._run_many, args=(targets,), daemon=True).start()
 
         return self._json(202, {"started": targets})
