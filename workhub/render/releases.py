@@ -2,7 +2,7 @@
 from collections import defaultdict
 
 from ..text import count, t
-from .layout import chip, empty, esc, notes, section, table, ticket_link, version_link
+from .layout import attr, chip, empty, esc, notes, section, table, ticket_link, version_link
 
 PROGRESS_TONES = {"review": "accent", "qa": "wait", "done": "ok", "mine": ""}
 
@@ -22,7 +22,7 @@ def _mr_marks(mrs):
             label += ", %s" % count(mr["unresolved"], "unresolved thread")
 
         marks.append('<a href="%s" target="_blank" rel="noopener">%s</a>'
-                     % (esc(mr.get("web_url")), chip(label + ")", tone)))
+                     % (attr(mr.get("web_url")), chip(label + ")", tone)))
 
     return " ".join(marks)
 
@@ -81,7 +81,7 @@ def _release(name, when, items, mrs):
   </h3>
   <div class="release-body">%s</div>
 </section>""" % (
-        esc(name), "" if mine else " data-none-mine",
+        attr(name), "" if mine else " data-none-mine",
         ' data-finished="%s"' % esc(reason) if reason else "", esc(t("fold this release")),
         version_link(known["key"], known.get("release_id"), name), esc(when),
         chip(count(len(items), "task"), "count-all"),

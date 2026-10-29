@@ -7,7 +7,7 @@ actually read, so a value that exists can be recognised without being shown or c
 from .. import config
 from ..text import t
 
-from .layout import chip, esc, section
+from .layout import attr, chip, esc, section
 
 SOURCE_LABELS = {"keychain": "Keychain", ".env": ".env", "environment": "the environment",
                  "file": "~/.claude/.secrets"}
@@ -36,12 +36,12 @@ def _field(item):
          autocomplete="new-password" placeholder="%s">
   <label class="switch" title="%s">
     <input type="checkbox" data-setting-clear="%s"%s> %s
-  </label>""" % (esc(item["key"]), esc(t("unchanged") if item["set"] else t("paste a token")),
+  </label>""" % (attr(item["key"]), esc(t("unchanged") if item["set"] else t("paste a token")),
                  esc(t("Remove the stored value from .env")),
-                 esc(item["key"]), "" if item["set"] else " disabled", esc(t("clear")))
+                 attr(item["key"]), "" if item["set"] else " disabled", esc(t("clear")))
     else:
         control = '<input type="text" class="setting-input" data-setting="%s" value="%s" placeholder="%s">' % (
-            esc(item["key"]), esc(item["hint"]), esc(t(item["placeholder"])))
+            attr(item["key"]), attr(item["hint"]), esc(t(item["placeholder"])))
 
     return """<div class="setting">
   <div class="setting-head">

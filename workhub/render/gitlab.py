@@ -2,7 +2,7 @@
 from collections import Counter
 
 from ..text import count, t
-from .layout import chip, copy_button, empty, esc, link, section, shown, table
+from .layout import attr, chip, copy_button, empty, esc, link, section, shown, table
 
 STATE_TONES = {"nowy": "accent", "re-review": "wait"}
 
@@ -15,7 +15,7 @@ STATE_PICK_LABELS = {"nowy": "new", "re-review": "re-review"}
 def _pick_box(item):
     return ('<input type="checkbox" class="pick" data-url="%s" data-state="%s"'
             ' aria-label="%s">'
-            % (esc(item.get("web_url")), esc(item.get("state") or ""),
+            % (attr(item.get("web_url")), attr(item.get("state") or ""),
                esc(t("select MR !%s") % item.get("iid"))))
 
 
@@ -28,7 +28,7 @@ def _picker(items):
         toggles.append(
             '<label class="switch"><input type="checkbox" data-pick-all="%s"> %s'
             ' <span class="muted">(%d)</span></label>'
-            % (esc(state), esc(t(STATE_PICK_LABELS.get(state, state))), counts[state]))
+            % (attr(state), esc(t(STATE_PICK_LABELS.get(state, state))), counts[state]))
 
     return """<div class="picker" data-picker>
   %s

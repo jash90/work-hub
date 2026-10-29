@@ -19,8 +19,14 @@ def shown(value):
 
 
 def esc(value):
-    """Everything written into the page passes here, so this is where skill data turns English."""
+    """Text a person reads: this is where skill data turns English."""
     return html.escape(shown(value), quote=True)
+
+
+def attr(value):
+    """A value that drives something — a URL, a setting, a key the page matches on — escaped
+    and never translated, so a translation can never change where a link goes or what is saved."""
+    return html.escape("" if value is None else str(value), quote=True)
 
 
 def chip(text, tone=""):
@@ -300,7 +306,7 @@ def link(url, text, mono=False):
         return esc(text)
 
     return '<a href="%s" target="_blank" rel="noopener"%s>%s</a>' % (
-        esc(url), ' class="key"' if mono else "", esc(text))
+        attr(url), ' class="key"' if mono else "", esc(text))
 
 
 def ticket_link(key):
@@ -378,7 +384,7 @@ def mr_links(mrs):
 
         hint = " · ".join([x for x in (mr.get("repo"), mr.get("title")) if x] + detail)
         out.append('<a class="mr-link" href="%s" target="_blank" rel="noopener" title="%s">%s</a>'
-                   % (esc(mr.get("url")), esc(hint), chip("!%s" % mr.get("iid"), tone)))
+                   % (attr(mr.get("url")), esc(hint), chip("!%s" % mr.get("iid"), tone)))
 
     return " ".join(out)
 

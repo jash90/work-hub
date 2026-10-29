@@ -13,7 +13,7 @@ import datetime
 from .. import config
 from ..tempo import TARGET_HOURS
 from ..text import count, is_polish, month_name, t, weekday
-from .layout import chip, empty, esc, hours, section, table, ticket_link
+from .layout import attr, chip, empty, esc, hours, section, table, ticket_link
 
 QUARTER = 0.25
 
@@ -60,7 +60,7 @@ def _entry_row(entry):
     <button type="button" class="ghost" data-drop aria-label="%s">×</button>
   </td>
 </tr>""" % (
-        ' data-worklog-id="%s"' % esc(str(entry["id"])) if entry.get("id") else "",
+        ' data-worklog-id="%s"' % attr(entry["id"]) if entry.get("id") else "",
         ticket_link(entry["key"]),
         esc(subjects),
         '<span class="summary">%s</span>' % esc((entry.get("summary") or "")[:90]),
@@ -83,7 +83,7 @@ def _day(day, mode):
         trailing = '<button class="danger" data-tempo-clear>%s</button>' % esc(t("Clear the day"))
     elif mode == "propose":
         trailing = '<button class="danger" data-tempo-undo="%s">%s</button>' % (
-            esc(day["day"]), esc(t("Undo")))
+            attr(day["day"]), esc(t("Undo")))
     else:
         trailing = ""
 
@@ -119,12 +119,12 @@ def _day(day, mode):
     <span class="muted hint" data-hint></span>
   </div>
 </article>""" % (
-        esc(day["day"]), TARGET_HOURS, ENDPOINTS[mode],
+        attr(day["day"]), TARGET_HOURS, ENDPOINTS[mode],
         esc(_date(day["day"])), esc(_weekday(day["day"])), esc(day["day"]),
         esc(hours(day.get("total_hours", 0))),
         esc(t("Allow a day shorter than 8 h to be written")), esc(t("short day")),
         esc(t("Allow a day longer than 8 h to be written")), esc(t("overtime")),
-        esc(day["day"]),
+        attr(day["day"]),
         esc(t("Save changes") if mode == "logged" else t("Log the day")),
         trailing,
         "".join(_entry_row(e) for e in entries),

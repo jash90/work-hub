@@ -126,6 +126,13 @@ class English(unittest.TestCase):
 
         self.assertEqual("something entirely new", translate.english("coś zupełnie nowego"))
 
+    def test_values_that_drive_the_page_are_never_translated(self):
+        translate._known()["nowy w kolejce"] = "new in the queue"
+
+        self.assertEqual("new in the queue", layout.esc("nowy w kolejce"))
+        self.assertEqual("nowy w kolejce", layout.attr("nowy w kolejce"))
+        self.assertIn('href="https://x/nowy w kolejce"', layout.link("https://x/nowy w kolejce", "a"))
+
     def test_a_failed_or_misshapen_answer_caches_nothing(self):
         def broken(texts):
             raise RuntimeError("model down")
