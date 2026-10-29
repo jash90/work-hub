@@ -1,14 +1,14 @@
-"""Overtime, summed the only way the hub can honestly sum it: one day at a time.
+"""Overtime as a balance, summed one day at a time.
 
-A day above eight hours contributes its surplus; a day below them contributes nothing. A
-short Tuesday is not a debt that the following Thursday pays off — the figure in the rail
-answers "how much did I work beyond the norm", not "did I make my hours", and the two
-questions have different answers in every month that holds both kinds of day. A weekend or
-a public holiday contributes everything logged on it, because none of it was owed.
+A workday contributes what was logged minus eight hours, so a short day pays off a long one:
+eight hours of overtime taken back as a day off nets to zero. A weekend or a public holiday
+contributes everything logged on it, because none of it was owed.
 
-Which days those are is never decided here. The skill already marks every day it returns
-with `workday`, so the hub holds no calendar and knows no Polish holiday — it multiplies
-and adds, exactly as the week totals in render/tempo.py do.
+Two kinds of day owe nothing. Workdays before the first logged hour precede this Tempo, and
+the last day of the range is still in progress — its surplus counts, its shortfall not yet.
+
+Which days are workdays is never decided here. The skill already marks every day it returns
+with `workday`, so the hub holds no calendar and knows no Polish holiday.
 
 Nothing in this module filters by ticket. An hour booked on an absence or an administrative
 key is an hour that was logged, and a rail that silently dropped some of them would be
@@ -24,34 +24,40 @@ def _empty():
     return {"total": 0.0, "months": [], "year": ""}
 
 
-def _surplus(day):
+def _balance(day, owes):
     logged = day.get("total_hours") or 0
 
     if not day.get("workday"):
         return logged
 
-    return max(0.0, logged - TARGET_HOURS)
+    balance = logged - TARGET_HOURS
+
+    return balance if owes else max(0.0, balance)
 
 
-def by_month(days):
+def by_month(days, until=None):
     """One entry per month that holds at least one logged hour, newest first.
+
+    `until` is the last day of the range, the one still in progress.
 
     A month nothing was ever logged in is not a month of zero overtime — it is a month this
     Tempo has never heard of, and five of those in a row say nothing worth the rail's space.
     """
     months = {}
+    days = [day for day in days or [] if isinstance(day, dict)]
+    logged_days = [str(day.get("day") or "") for day in days if day.get("total_hours")]
+    first_logged = min(logged_days, default="")
 
-    for day in days or []:
-        if not isinstance(day, dict):
-            continue
-
-        month = str(day.get("day") or "")[:7]
+    for day in days:
+        iso = str(day.get("day") or "")
+        month = iso[:7]
 
         if len(month) != 7:
             continue
 
+        owes = bool(first_logged) and first_logged <= iso and iso != until
         bucket = months.setdefault(month, {"month": month, "hours": 0.0, "logged": 0.0})
-        bucket["hours"] += _surplus(day)
+        bucket["hours"] += _balance(day, owes)
         bucket["logged"] += day.get("total_hours") or 0
 
     for bucket in months.values():
@@ -90,7 +96,7 @@ def summary():
         year = (store.read("tempo") or {}).get("payload") or {}
         year = year.get("year") if isinstance(year, dict) else None
         year = year if isinstance(year, dict) else {}
-        months = by_month(year.get("days"))
+        months = by_month(year.get("days"), until=year.get("to"))
         value = {"total": round(float(sum(m["hours"] for m in months)), 2),
                  "months": months,
                  "year": str(year.get("from") or "")[:4]}

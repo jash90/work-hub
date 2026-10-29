@@ -2,7 +2,7 @@
 from collections import defaultdict
 
 from ..text import count
-from .layout import chip, empty, esc, notes, section, table, ticket_link
+from .layout import chip, empty, esc, notes, section, table, ticket_link, version_link
 
 PROGRESS_TONES = {"review": "accent", "qa": "wait", "done": "ok", "mine": ""}
 
@@ -62,25 +62,30 @@ def _release(name, when, items, mrs):
         rows.append([
             ticket_link(issue["key"]),
             chip(issue.get("status") or "—", PROGRESS_TONES.get(issue.get("progress"), "")),
-            '<span class="repo">%s</span>' % esc(issue.get("assignee") or "—"),
+            '<span class="repo"%s>%s</span>' % ("" if issue.get("mine") else " data-theirs",
+                                               esc(issue.get("assignee") or "—")),
             '<span class="summary">%s</span>' % esc(issue.get("summary")),
             _mr_marks(mrs.get(issue["key"])),
         ])
 
     reason = finished_reason(items)
+    mine = sum(1 for i in items if i.get("mine"))
+    known = next((i for i in items if i.get("release_id")), items[0])
 
-    return """<section class="block release" data-release="%s"%s>
+    return """<section class="block release" data-release="%s"%s%s>
   <h3>
     <button type="button" class="ghost release-fold" data-release-fold aria-expanded="true"
             aria-label="fold this release">▾</button>
     <span class="release-name">%s</span><span class="muted">%s</span>
-    %s%s
+    %s%s%s
   </h3>
   <div class="release-body">%s</div>
 </section>""" % (
-        esc(name), ' data-finished="%s"' % esc(reason) if reason else "",
-        esc(name), esc(when),
-        chip(count(len(items), "task")),
+        esc(name), "" if mine else " data-none-mine",
+        ' data-finished="%s"' % esc(reason) if reason else "",
+        version_link(known["key"], known.get("release_id"), name), esc(when),
+        chip(count(len(items), "task"), "count-all"),
+        chip("%d of %d mine" % (mine, len(items)), "count-mine"),
         ' <span class="muted finished-why">%s</span>' % esc(reason) if reason else "",
         table(["Ticket", "Status", "Assignee", "Summary", "MR"], rows),
     )
@@ -102,6 +107,7 @@ def body(payload):
         blocks.append("""<div class="release-bar" data-release-bar>
   <span class="muted" data-fold-count>%s</span>
   <span class="spacer"></span>
+  <label class="switch"><input type="checkbox" data-only-mine> Only my tasks</label>
   <button type="button" class="ghost" data-fold-all="yes">Fold all</button>
   <button type="button" class="ghost" data-fold-all="no">Unfold all</button>
 </div>""" % esc("%s folded as finished" % count(finished, "release") if finished else ""))

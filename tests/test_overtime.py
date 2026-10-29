@@ -1,8 +1,8 @@
 """What the figure in the rail counts, and what it refuses to count.
 
-The rule under test is one-directional: hours above eight are overtime, hours below eight
-are not a debt. Every test here defends that asymmetry, because the tempting "logged minus
-expected" would pass most of the same cases and answer a different question.
+The rule under test is a balance: a workday adds what was logged minus eight hours, so time
+taken back as a day off pays overtime off. Days before the first logged hour and the day
+still in progress never owe anything.
 """
 import os
 import unittest
@@ -20,15 +20,32 @@ class Arithmetic(unittest.TestCase):
     def test_a_long_day_contributes_its_surplus(self):
         self.assertEqual(2.0, overtime.by_month([day("2026-09-16", 10)])[0]["hours"])
 
-    def test_a_short_day_contributes_nothing(self):
-        self.assertEqual(0.0, overtime.by_month([day("2026-09-01", 5)])[0]["hours"])
+    def test_a_short_day_contributes_its_shortfall(self):
+        self.assertEqual(-3.0, overtime.by_month([day("2026-09-01", 5)])[0]["hours"])
 
-    def test_a_short_day_does_not_pay_off_a_long_one(self):
-        """The rail answers "how much beyond the norm", not "did I make my hours"."""
-        months = overtime.by_month([day("2026-09-16", 10), day("2026-09-01", 5)])
+    def test_a_short_day_pays_off_a_long_one(self):
+        months = overtime.by_month([day("2026-09-16", 10), day("2026-09-17", 5)])
 
-        self.assertEqual(2.0, months[0]["hours"])
+        self.assertEqual(-1.0, months[0]["hours"])
         self.assertEqual(15.0, months[0]["logged"])
+
+    def test_a_day_off_takes_back_a_weekend_of_overtime(self):
+        months = overtime.by_month([day("2026-10-17", 8, workday=False), day("2026-10-20", 0)])
+
+        self.assertEqual(0.0, months[0]["hours"])
+
+    def test_workdays_before_the_first_logged_hour_owe_nothing(self):
+        months = overtime.by_month([day("2026-05-29", 0), day("2026-06-01", 9)])
+
+        self.assertEqual(["2026-06"], [m["month"] for m in months])
+        self.assertEqual(1.0, months[0]["hours"])
+
+    def test_the_day_in_progress_adds_its_surplus_but_owes_nothing_yet(self):
+        days = [day("2026-10-28", 8), day("2026-10-29", 3)]
+
+        self.assertEqual(0.0, overtime.by_month(days, until="2026-10-29")[0]["hours"])
+        self.assertEqual(2.0, overtime.by_month([day("2026-10-28", 8), day("2026-10-29", 10)],
+                                                 until="2026-10-29")[0]["hours"])
 
     def test_a_weekend_counts_in_full(self):
         """None of it was owed, so all of it is over the norm."""
@@ -80,7 +97,8 @@ class Envelope(unittest.TestCase):
 
     def test_it_sums_the_year_command(self):
         self.seed({"year": {"from": "2026-01-01", "to": "2026-09-22",
-                            "days": [day("2026-09-16", 11), day("2026-08-12", 10)]}})
+                            "days": [day("2026-09-16", 11), day("2026-08-12", 10),
+                                     day("2026-09-22", 0)]}})
 
         figure = overtime.summary()
 

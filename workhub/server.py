@@ -9,6 +9,7 @@ import json
 import os
 import secrets
 import socket
+import sys
 import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -36,7 +37,12 @@ class Handler(BaseHTTPRequestHandler):
     hub = None
 
     def log_message(self, fmt, *args):
-        pass
+        if self.command != "POST":
+            return
+
+        sys.stderr.write("%s %s host=%s ua=%s\n" % (
+            self.log_date_time_string(), fmt % args, self.headers.get("Host"),
+            (self.headers.get("User-Agent") or "")[-60:]))
 
     # ---------- plumbing ----------
 

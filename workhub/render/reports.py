@@ -1,22 +1,13 @@
-"""Panels whose skill needs a model to finish the job.
+"""Report-shaped panels.
 
-`commits` and `protokol` show exactly what their scripts produce on their own and hand the
-rest to Claude Code through a copyable brief. The hub never invents the narrative it does
-not have.
+`commits` renders daily-commit-summary's own JSON, prose included: the skill writes it with
+`claude -p` and caches it per row. `protokol` still hands its legal rewrite to Claude Code
+through a copyable brief — the hub never invents prose it has not got.
 """
+import datetime
+
 from ..text import count
-from .layout import chip, copy_button, empty, esc, section, table, ticket_link
-
-COMMITS_BRIEF = """Run the daily-commit-summary skill and build an HTML report from the data
-below (the `plain` field in plain words, 2-3 sentences). The data is already gathered — do
-not collect it again.
-
-=== COMMITS ===
-%s
-
-=== MERGE STATUS ===
-%s
-"""
+from .layout import chip, copy_button, empty, esc, mr_links, section, table, ticket_link
 
 # The report itself is a Polish legal document, so the phrasing it asks for stays Polish —
 # only the instruction around it is in English.
@@ -27,26 +18,81 @@ rewrite each one in the required legal phrasing („Kod źródłowy …") and fi
 """
 
 
-def commits_body(payload):
-    commits = payload.get("commits") or ""
-    merge = payload.get("merge") or ""
+# daily-commit-summary decides the state and its tone; the hub only puts it into words.
+COMMIT_STATES = {
+    "merged": "on develop",
+    "merged_elsewhere": "merged",
+    "release": "on a release branch only",
+    "draft": "draft MR",
+    "ready": "ready for review",
+    "followup_draft": "follow-up · draft MR",
+    "followup_ready": "follow-up · ready for review",
+    "abandoned": "MR closed",
+    "no_mr": "pushed, no MR",
+    "local": "not pushed",
+}
 
-    blocks = [
-        section("Commits today", '<pre class="raw">%s</pre>' % esc(commits.strip() or "No commits."),
-                copy_button("Copy the brief for Claude", COMMITS_BRIEF % (commits, merge))),
-        section("Merge status", '<pre class="raw">%s</pre>' % esc(merge.strip() or "No data.")),
+TONE_CHIPS = {"ok": "ok", "wait": "wait", "build": "build", "neutral": ""}
+
+
+def _with_code(text):
+    """The skill's prose is plain text that may wrap identifiers in <code>; nothing else passes."""
+    return esc(text).replace("&lt;code&gt;", "<code>").replace("&lt;/code&gt;", "</code>")
+
+
+def _commit_row(row):
+    mr = row.get("mr")
+    tickets = "<br>".join(ticket_link(key) for key in row["tickets"])
+    subjects = "\n".join(c["subject"] for c in row["commits"])
+    status = chip(COMMIT_STATES.get(row["state"], row["state"]), TONE_CHIPS.get(row["tone"], ""))
+    where = (mr_links([{"iid": mr["iid"], "url": mr["web_url"], "title": mr.get("title")}])
+             if mr else '<span class="muted key">%s</span>' % esc(row.get("ref")))
+
+    return [
+        '%s<br><span class="muted" title="%s">%s</span>'
+        % (tickets, esc(subjects), esc(count(len(row["commits"]), "commit"))),
+        '<div class="summary">%s</div><p class="muted">%s</p>'
+        % (_with_code(row["scope"]), esc(row["plain"])),
+        "%s %s" % (status, where),
     ]
 
-    return "".join(blocks)
+
+def _commit_rows(payload):
+    return [row for repo_day in payload["main"]["sections"] for row in repo_day["rows"]]
+
+
+def commits_body(payload):
+    data = payload.get("main")
+
+    if not data:
+        return empty("This panel's data predates the current report format — click “Refresh”.")
+
+    blocks = []
+
+    for repo_day in data["sections"]:
+        day = datetime.date.fromisoformat(repo_day["day"]).strftime("%a %d.%m")
+        blocks.append(section(
+            "%s · %s" % (day, repo_day["repo"]),
+            table(["Ticket", "What changed", "Status"], [_commit_row(r) for r in repo_day["rows"]]),
+            '<span class="muted">%s</span>' % esc(count(repo_day["commits"], "commit"))))
+
+    return "".join(blocks) or empty("No commits in the last 30 days.")
 
 
 def commits_headline(payload):
-    text = payload.get("commits") or ""
-    lines = [l for l in text.splitlines() if " | " in l]
-    repos = [l for l in text.splitlines() if l.startswith("=====")]
+    if not payload.get("main"):
+        return '<span class="muted">refresh needed</span>'
 
-    return " ".join([chip(count(len(lines), "commit")),
-                     chip(count(len(repos), "repository", "repositories"))])
+    rows = _commit_rows(payload)
+    tickets = sum(len(r["tickets"]) for r in rows)
+    merged = sum(len(r["tickets"]) for r in rows if r["tone"] == "ok")
+    waiting = sum(len(r["tickets"]) for r in rows if r["tone"] == "wait")
+    commits = sum(repo_day["commits"] for repo_day in payload["main"]["sections"])
+
+    return " ".join([chip(count(commits, "commit")),
+                     chip(count(tickets, "ticket")),
+                     chip("%d on develop" % merged, "ok" if merged else ""),
+                     chip("%d waiting" % waiting, "wait" if waiting else "")])
 
 
 def protokol_body(payload):

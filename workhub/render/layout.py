@@ -25,6 +25,10 @@ def hours(value):
     return "%g" % round(value, 2)
 
 
+def signed_hours(value):
+    return "%+g" % round(value, 2)
+
+
 def month_name(month):
     """A month key as a name: 2026-09 is September.
 
@@ -155,20 +159,20 @@ def rail_figure():
     """
     figure = rail_data()
     rows = "".join(
-        '<li><span>%s</span><span class="num">+%s h</span></li>'
-        % (esc(month["label"]), esc(hours(month["hours"])))
+        '<li><span>%s</span><span class="num">%s h</span></li>'
+        % (esc(month["label"]), esc(signed_hours(month["hours"])))
         for month in figure["months"])
 
     return """<div class="nav-group nav-foot rail-figure" data-overtime-figure data-open="yes"%s>
       <button type="button" class="rail-total" data-overtime-fold aria-expanded="true">
         <span data-overtime-label>%s</span>
-        <strong class="num" data-overtime-total>+%s h</strong>
+        <strong class="num" data-overtime-total>%s h</strong>
         <span class="caret">▾</span>
       </button>
       <ul class="rail-months" data-overtime-months>%s</ul>
     </div>""" % ("" if figure["months"] else " hidden",
                  esc(("Overtime %s" % figure["year"]).strip()),
-                 esc(hours(figure["total"])), rows)
+                 esc(signed_hours(figure["total"])), rows)
 
 
 def sidebar(active):
@@ -272,6 +276,15 @@ def ticket_link(key):
     base = config.jira_base_url()
 
     return link("%s/browse/%s" % (base, key) if base else "", key, mono=True)
+
+
+def version_link(key, version_id, name):
+    """A fixVersion name, linked to its page in the project of `key`, one of its tickets."""
+    base = config.jira_base_url()
+    project = key.split("-")[0]
+
+    return link("%s/projects/%s/versions/%s" % (base, project, version_id)
+                if base and version_id else "", name)
 
 
 def table(headers, rows):

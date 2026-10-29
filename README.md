@@ -127,12 +127,18 @@ coming back as the skill's `sys.exit`.
 Those rules live in `workhub/static/day-rules.js`, deliberately free of the DOM, and are
 tested by running them under Node (`tests/test_day_rules.py`).
 
-## Two panels need Claude
+## Panels with prose
 
-`commits` and `protokol` show what their scripts produce on their own and offer a
-**“Copy the brief for Claude”** button; the narrative (daily-commit-summary's `plain` field)
-and the legal rewrite (the acceptance report) still happen in a Claude Code session. The hub
-does not pretend to have prose it has not got.
+`commits` runs `daily-commit-summary/live.py json`: the last two days with commits, ticket
+by ticket, with the merge state and the plain-words text. The skill writes that text itself
+with `claude -p` and caches it by the row's commit subjects, so a refresh only waits for the
+model on rows that changed — the first run of a day can take a minute or two, which is why
+the panel has a 600 s timeout. The skill decides each row's `state`; the hub only puts it
+into words.
+
+`protokol` shows what its script produces and offers a **“Copy the brief for Claude”**
+button; the legal rewrite of the acceptance report still happens in a Claude Code session.
+The hub does not pretend to have prose it has not got.
 
 ## Running it
 
@@ -195,6 +201,19 @@ explicit choices are stored, so a release that finishes later still folds itself
 that reopens still unfolds. Folding hides a release's tasks, never the release: the header
 stays, or hiding would become losing.
 
+### Only my tasks
+
+**Only my tasks** in the board's top bar narrows every release to my own rows, and its
+header count turns from `27 tasks` into `3 of 27 mine`. A release with nothing of mine left
+in it is hidden whole. The switch is remembered per browser and only hides rows the page
+already has — the team's tasks stay in the payload, and the status-change log below the
+releases is not filtered.
+
+A release's name links to its fixVersion page in Jira (`…/projects/SOFKAN/versions/26022`).
+The id comes from the skill's payload (`release_id`, set by `redge_work.releases.build_row`)
+and the project from the key of a ticket in it; a payload fetched before that field existed
+leaves the name as plain text until the next refresh.
+
 ### Overtime in the rail
 
 The rail closes with the overtime logged so far this year — one total, and the months it came
@@ -246,7 +265,7 @@ textarea and `execCommand` rather than failing silently.
 Every ticket number on a task-shaped panel carries a clickable `!706` chip pointing at the
 merge request that mentions it. Nothing extra is fetched: the skills behind `releases`,
 `dashboard`, `review-queue` and `pr-request` each already match an MR to a ticket by the key
-in its title or branch (`redge_work.gitlab.jira_key_of`), so `workhub/links.py` only gathers
+in its title or branch (`redge_work.gitlab.jira_keys_of`), so `workhub/links.py` only gathers
 those answers from the stored payloads into one `key → MRs` lookup.
 
 `priority` and `testing` gain the column outright — their own skills never report an MR.

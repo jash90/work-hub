@@ -1,14 +1,17 @@
 """Jira key → its merge requests, joined from payloads the hub already holds.
 
 Nothing new is fetched. The skills behind `releases`, `dashboard`, `review-queue` and
-`pr-request` each match an MR to a ticket by the key in its title or branch
-(`redge_work.gitlab.jira_key_of`), so the join is already done upstream — this module only
-gathers those answers into one lookup the task-shaped panels can render.
+`pr-request` each match an MR to its tickets by the keys in its title or branch
+(`redge_work.gitlab.jira_keys_of`), so the join is already done upstream — this module only
+gathers those answers into one lookup the task-shaped panels can render. An MR naming
+several tickets is listed under each of them.
 
 A panel whose own payload carries MRs (dashboard tasks, the release board) keeps them;
 this fills in the panels whose skill never reports one, `priority` and `testing`.
 """
 import re
+
+from redge_work.gitlab import keys_of
 
 from . import store
 
@@ -36,8 +39,9 @@ MR_URL = re.compile(r"/([^/]+)/-/merge_requests/(\d+)")
 
 def _from_dashboard(payload):
     for mr in list(payload.get("ready") or []) + list(payload.get("other_mrs") or []):
-        yield _mr(mr.get("key"), mr.get("iid"), mr.get("web_url"), mr.get("repo"),
-                  mr.get("title"), mr.get("approval_count"), mr.get("unresolved"))
+        for key in keys_of(mr):
+            yield _mr(key, mr.get("iid"), mr.get("web_url"), mr.get("repo"),
+                      mr.get("title"), mr.get("approval_count"), mr.get("unresolved"))
 
     for task in payload.get("tasks") or []:
         for mr in task.get("mrs") or []:
@@ -72,7 +76,7 @@ READERS = {"releases": _from_releases, "dashboard": _from_dashboard,
 
 
 def build(read=None):
-    """Returns {jira key: [mr, …]}, each MR once, from whatever panels have run."""
+    """Returns {jira key: [mr, …]}, each MR once per ticket, from whatever panels have run."""
     read = read or (lambda panel_id: (store.read(panel_id) or {}).get("payload"))
     index = {}
     seen = set()
@@ -89,7 +93,7 @@ def build(read=None):
             if not mr:
                 continue
 
-            identity = (mr["repo"], mr["iid"])
+            identity = (mr["key"], mr["repo"], mr["iid"])
 
             if identity in seen:
                 continue

@@ -71,6 +71,35 @@ class BuildingTheIndex(unittest.TestCase):
         self.assertEqual({}, index)
 
 
+class OneMrSeveralTickets(unittest.TestCase):
+    """fix(ABC-3 ABC-4) delivers both tickets, so both must link it."""
+
+    MR = {"iid": "773", "web_url": "https://gl/773", "repo": "team-portal"}
+
+    def build(self, panels):
+        return links.build(read=panels.get)
+
+    def test_a_release_board_mr_filed_under_two_tickets_links_both(self):
+        releases = {"main": {"mrs": {"ABC-3": [dict(self.MR, key="ABC-3")],
+                                     "ABC-4": [dict(self.MR, key="ABC-3")]}}}
+        index = self.build({"releases": releases})
+
+        self.assertEqual(["773", "773"], [index[k][0]["iid"] for k in ("ABC-3", "ABC-4")])
+
+    def test_a_dashboard_mr_links_every_key_it_carries(self):
+        dashboard = {"main": {"other_mrs": [dict(self.MR, key="ABC-3", keys=["ABC-3", "ABC-4"])]}}
+        index = self.build({"dashboard": dashboard})
+
+        self.assertEqual({"ABC-3", "ABC-4"}, set(index))
+
+    def test_a_task_links_an_mr_already_filed_under_another_ticket(self):
+        dashboard = {"main": {"other_mrs": [dict(self.MR, key="ABC-3")],
+                              "tasks": [{"key": "ABC-4", "mrs": [self.MR]}]}}
+        index = self.build({"dashboard": dashboard})
+
+        self.assertEqual(["773"], [m["iid"] for m in index["ABC-4"]])
+
+
 class DriftRows(unittest.TestCase):
     """A ticket in testing has a merged MR, which only the drift rows still mention."""
 

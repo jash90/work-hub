@@ -764,3 +764,7 @@ input.hours { -moz-appearance: textfield; }
 .release[data-folded="yes"] h3 { margin-bottom: 0; }
 .release[data-finished] .release-name { color: hsl(var(--muted-foreground)); }
 .finished-why { font-size: 12px; }
+.release:not([data-only-mine="yes"]) .count-mine,
+.release[data-only-mine="yes"] .count-all,
+.release[data-only-mine="yes"] tr:has([data-theirs]),
+.release[data-only-mine="yes"][data-none-mine] { display: none; }

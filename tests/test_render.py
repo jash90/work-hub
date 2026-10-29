@@ -373,3 +373,77 @@ class OvertimeInTheRail(unittest.TestCase):
 
         self.assertIn('href="/settings"', layout.sidebar("settings"))
 
+
+
+class ReleaseOnlyMine(unittest.TestCase):
+    """The switch that narrows the board to my own tasks. The browser hides; the page marks."""
+
+    def issue(self, key, mine, release="R 1.0"):
+        return {"key": key, "progress": "review", "mine": mine, "release_name": release,
+                "status": "Code review", "summary": ""}
+
+    def body(self, *issues):
+        return releases.body({"main": {"mrs": {}, "issues": list(issues)}})
+
+    def test_the_bar_carries_the_switch(self):
+        self.assertIn("data-only-mine", self.body(self.issue("ABC-1", True)))
+
+    def test_a_teammates_task_is_marked_and_mine_is_not(self):
+        html = self.body(self.issue("ABC-1", True), self.issue("DEF-2", False))
+        rows = html.split("<tr>")
+        mine = next(r for r in rows if "ABC-1" in r)
+        theirs = next(r for r in rows if "DEF-2" in r)
+
+        self.assertNotIn("data-theirs", mine)
+        self.assertIn("data-theirs", theirs)
+
+    def test_a_release_says_how_many_of_its_tasks_are_mine(self):
+        html = self.body(self.issue("ABC-1", True), self.issue("DEF-2", False),
+                         self.issue("DEF-3", False))
+
+        self.assertIn("3 tasks", html)
+        self.assertIn("1 of 3 mine", html)
+
+    def test_a_release_with_nothing_of_mine_is_marked_so(self):
+        html = self.body(self.issue("ABC-1", True, release="Mine 1.0"),
+                         self.issue("DEF-2", False, release="Team 1.0"))
+
+        self.assertIn('data-release="Team 1.0" data-none-mine', html)
+        self.assertNotIn('data-release="Mine 1.0" data-none-mine', html)
+
+
+class ReleaseVersionLink(unittest.TestCase):
+    """A release name opens its fixVersion page in Jira, which lists every ticket in it."""
+
+    def setUp(self):
+        from workhub import config
+
+        self.config = config
+        self.addCleanup(self.clear)
+        self.clear()
+
+    def clear(self):
+        self.config._cache.update(stamp=None, values={})
+
+        if os.path.exists(self.config.ENV_PATH):
+            os.unlink(self.config.ENV_PATH)
+
+    def body(self, **issue):
+        row = dict({"key": "SOFKAN-1", "progress": "review", "mine": True, "status": "Code review",
+                    "summary": "", "release_name": "Apple_Android TV 12.2.0"}, **issue)
+
+        return releases.body({"main": {"mrs": {}, "issues": [row]}})
+
+    def test_the_name_links_to_the_version_in_the_tickets_project(self):
+        self.config.save({"JIRA_BASE_URL": "https://jira.example.com/"})
+        html = self.body(release_id="26022")
+
+        self.assertIn('href="https://jira.example.com/projects/SOFKAN/versions/26022"', html)
+
+    def test_a_payload_without_the_version_id_keeps_the_name_plain(self):
+        self.config.save({"JIRA_BASE_URL": "https://jira.example.com/"})
+
+        self.assertNotIn("/versions/", self.body())
+
+    def test_without_an_address_the_name_stays_plain_text(self):
+        self.assertNotIn("/versions/", self.body(release_id="26022"))

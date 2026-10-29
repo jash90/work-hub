@@ -80,13 +80,23 @@ function busy(ids, on) {
   }
 }
 
+// The header holds the freshness stamp and the headline chips, so it is swapped with the body.
 async function repaint(panel) {
-  const host = document.querySelector(`[data-panel="${panel.id}"] [data-fragment]`);
+  const section = document.querySelector(`section.panel[data-panel="${panel.id}"]`);
 
-  if (host) {
-    host.innerHTML = await (await fetch(`/p/${panel.id}/fragment`)).text();
-    bind(host);
-  }
+  if (!section) return;
+
+  const page = new DOMParser().parseFromString(await (await fetch(`/p/${panel.id}`)).text(), 'text/html');
+  const fresh = page.querySelector(`section.panel[data-panel="${panel.id}"]`);
+
+  if (!fresh) return;
+
+  section.dataset.state = fresh.dataset.state;
+  section.querySelector('.panel-head').replaceWith(fresh.querySelector('.panel-head'));
+
+  const body = fresh.querySelector('[data-fragment]');
+  section.querySelector('[data-fragment]').replaceWith(body);
+  bind(body);
 }
 
 // Poll until the named panels stop running, then bring their markup up to date.
@@ -136,7 +146,16 @@ document.addEventListener('click', async (event) => {
 
   if (!one && !all) return;
 
-  const { data } = await post('/api/refresh', all ? { all: true } : { panel: one.dataset.refresh });
+  const { status, data } = await post('/api/refresh', all ? { all: true } : { panel: one.dataset.refresh });
+
+  // The CSRF token is minted at start-up, so a tab opened before a hub restart holds a dead one.
+  if (status === 403) {
+    toast('The hub restarted since this page loaded — reloading…', 'bad');
+    setTimeout(() => window.location.reload(), 1200);
+
+    return;
+  }
+
   const ids = data.started || [];
 
   busy(ids, true);
@@ -443,6 +462,26 @@ function applyFold(section, folded) {
   toggle.textContent = folded ? '▸' : '▾';
 }
 
+const ONLY_MINE_KEY = 'work-hub-releases-only-mine';
+
+function readOnlyMine() {
+  try {
+    return localStorage.getItem(ONLY_MINE_KEY) === 'yes';
+  } catch (e) {
+    return false;
+  }
+}
+
+function writeOnlyMine(on) {
+  try {
+    localStorage.setItem(ONLY_MINE_KEY, on ? 'yes' : 'no');
+  } catch (e) { /* private window — the filter just won't be remembered */ }
+}
+
+function applyOnlyMine(sections, on) {
+  for (const section of sections) section.dataset.onlyMine = on ? 'yes' : 'no';
+}
+
 function bindReleases(root) {
   const sections = [...root.querySelectorAll('.release[data-release]')];
 
@@ -477,6 +516,18 @@ function bindReleases(root) {
       }
     };
   }
+
+  const onlyMine = root.querySelector('input[data-only-mine]');
+
+  if (!onlyMine) return;
+
+  onlyMine.checked = readOnlyMine();
+  applyOnlyMine(sections, onlyMine.checked);
+
+  onlyMine.onchange = () => {
+    applyOnlyMine(sections, onlyMine.checked);
+    writeOnlyMine(onlyMine.checked);
+  };
 }
 
 /* ---------- picking merge requests out of the review queue ---------- */
@@ -660,6 +711,8 @@ function bindOvertime(root) {
 // The rail lives outside every [data-fragment], so repaint() never reaches it. Only the
 // numbers are swapped here: the container and its button stay, and with them the fold state
 // and the click handler bound to it once at load.
+const signedHours = (hours) => `${hours < 0 ? '' : '+'}${hours} h`;
+
 function paintOvertime(data) {
   const figure = document.querySelector('[data-overtime-figure]');
 
@@ -667,9 +720,9 @@ function paintOvertime(data) {
 
   figure.hidden = !data.months.length;
   figure.querySelector('[data-overtime-label]').textContent = `Overtime ${data.year}`.trim();
-  figure.querySelector('[data-overtime-total]').textContent = `+${data.total} h`;
+  figure.querySelector('[data-overtime-total]').textContent = signedHours(data.total);
   figure.querySelector('[data-overtime-months]').innerHTML = data.months
-    .map((month) => `<li><span>${month.label}</span><span class="num">+${month.hours} h</span></li>`)
+    .map((month) => `<li><span>${month.label}</span><span class="num">${signedHours(month.hours)}</span></li>`)
     .join('');
 }
 

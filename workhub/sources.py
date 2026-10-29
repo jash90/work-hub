@@ -124,13 +124,13 @@ PANELS = (
         (MORNING,),
         [Command("main", [PY3, skill("jira-my-testing-status", "check_status.py"), "--json"])],
     ),
+    # The prose in this panel is written by `claude -p` inside the skill and cached per row,
+    # so only the first run after new commits is slow — hence the long timeout.
     Panel(
-        "commits", "Commits today", "What landed in the repositories today and whether it is on develop yet.",
+        "commits", "Commits", "The last two days with commits, ticket by ticket: what changed, in plain words, and whether it is on develop yet.",
         (AFTERNOON,),
-        [
-            Command("commits", [skill("daily-commit-summary", "gather-commits.sh"), "today"], TEXT),
-            Command("merge", [skill("daily-commit-summary", "merge-status.sh"), "--no-fetch"], TEXT),
-        ],
+        [Command("main", [PY3, skill("daily-commit-summary", "live.py"), "json"])],
+        timeout=600,
     ),
     Panel(
         "tempo", "Tempo", "Week by week: what Tempo already holds and what to add from commits.",
