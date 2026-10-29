@@ -12,14 +12,16 @@ import socket
 import sys
 import threading
 import urllib.parse
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import DATA_DIR, config, render, sources, store
+from . import DATA_DIR, config, render, sources, store, text
 from .runner import Runner
 from .scheduler import Scheduler
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 LOOPBACK = {"localhost", "127.0.0.1", "[::1]", "::1"}
+LANG_COOKIE = "work-hub-lang"
 CONTENT_TYPES = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8"}
 
 
@@ -28,7 +30,7 @@ class Hub:
 
     def __init__(self):
         self.csrf = secrets.token_urlsafe(24)
-        self.runner = Runner()
+        self.runner = Runner(after_success=render.translate_panel)
         self.scheduler = Scheduler(self.runner)
 
 
@@ -79,9 +81,17 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---------- routing ----------
 
+    def _use_language(self):
+        """The `work-hub-lang` cookie, set by the toggle in the top bar; English without one."""
+        cookies = SimpleCookie(self.headers.get("Cookie") or "")
+        chosen = cookies.get(LANG_COOKIE)
+        text.use(chosen.value if chosen else text.ENGLISH)
+
     def do_GET(self):
         if not self._host_is_local():
             return self._send(403, "forbidden", "text/plain; charset=utf-8")
+
+        self._use_language()
 
         path = urllib.parse.urlparse(self.path).path
 
@@ -170,7 +180,7 @@ class Handler(BaseHTTPRequestHandler):
             envelope = store.read(panel.id) or store.blank(panel.id)
             panels.append({
                 "id": panel.id,
-                "label": panel.label,
+                "label": text.t(panel.label),
                 "running": panel.id in running,
                 "ok": envelope.get("error") is None and envelope.get("payload") is not None,
                 "fetched_at": envelope.get("fetched_at"),

@@ -3,6 +3,8 @@
 // every entry on the 15-minute grid, and 8 h exactly unless the day is marked as a short one
 // (partial) or as a long one (overtime) — each direction is its own opt-in, as in the skill.
 const QUARTER = 0.25;
+// In the page i18n.js is loaded first and its functions are globals; Node has to ask for them.
+const words = typeof module !== 'undefined' ? require('./i18n.js') : { t };
 
 const round15 = (value) => Math.max(0, Math.round(value / QUARTER) * QUARTER);
 const fmt = (value) => String(Number(value.toFixed(2)));
@@ -28,26 +30,21 @@ function dayVerdict(hours, target, partial, overtime) {
 
   let problem = '';
 
-  if (broken) problem = 'hours must be a number, e.g. 1.75';
-  else if (!counted.length) problem = 'add at least one entry';
-  else if (offGrid) problem = 'hours must be a multiple of 15 minutes';
-  else if (total < target && !partial) problem = `${fmt(target - total)} h short of ${fmt(target)} h`;
-  else if (total > target && !overtime) problem = `${fmt(total - target)} h over ${fmt(target)} h — tick "overtime"`;
+  if (broken) problem = words.t('hours must be a number, e.g. 1.75');
+  else if (!counted.length) problem = words.t('add at least one entry');
+  else if (offGrid) problem = words.t('hours must be a multiple of 15 minutes');
+  else if (total < target && !partial) problem = words.t('{0} h short of {1} h', fmt(target - total), fmt(target));
+  else if (total > target && !overtime) problem = words.t('{0} h over {1} h — tick "overtime"', fmt(total - target), fmt(target));
 
-  let note = 'ready to write';
+  let note = words.t('ready to write');
 
   if (problem) note = problem;
-  else if (total < target) note = `short day: ${fmt(total)} h`;
-  else if (total > target) note = `overtime: ${fmt(total)} h`;
+  else if (total < target) note = words.t('short day: {0} h', fmt(total));
+  else if (total > target) note = words.t('overtime: {0} h', fmt(total));
 
   return { total, problem, note, ok: !problem };
 }
 
-// Mirrors workhub.text.count — the same rule, on the other side of the wire.
-function count(n, one, many) {
-  return `${n} ${n === 1 ? one : (many || `${one}s`)}`;
-}
-
 if (typeof module !== 'undefined') {
-  module.exports = { QUARTER, round15, fmt, parseHours, dayVerdict, count };
+  module.exports = { QUARTER, round15, fmt, parseHours, dayVerdict };
 }

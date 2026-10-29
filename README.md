@@ -140,6 +140,23 @@ into words.
 button; the legal rewrite of the acceptance report still happens in a Claude Code session.
 The hub does not pretend to have prose it has not got.
 
+## Two languages
+
+The **PL / EN** button in the top bar switches the whole interface and remembers the choice
+in a `work-hub-lang` cookie; English is the default. English is written in place in the
+code; `workhub/catalog.py` holds the Polish for every phrase, Polish plural forms included,
+and a Polish page embeds that same table for `app.js` (`static/i18n.js`), so the browser
+never keeps a second copy.
+
+The skills write their own text in Polish — commit prose, review comments, drift advice,
+skip reasons, Tempo descriptions, the review-request post. In Polish it is shown as it is. In
+English, every Polish-looking string that reaches the page goes through `workhub/translate.py`:
+translated once by `claude -p` (haiku), remembered in `data/translations.json` and reused
+from there. A refresh translates its panel's new strings before the panel reports finished;
+a string a page meets for the first time shows in Polish once and is translated in the
+background for the next load. The payloads themselves stay untouched, because the renderers
+still match on the skills' own values. Names and identifiers come back unchanged.
+
 ## Running it
 
 launchd keeps it alive and starts it at login:

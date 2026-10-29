@@ -15,3 +15,8 @@ SANDBOX = tempfile.mkdtemp(prefix="work-hub-test-")
 os.environ.setdefault("WORK_HUB_DATA", SANDBOX)
 os.environ.setdefault("WORK_HUB_ENV", os.path.join(SANDBOX, ".env"))
 os.environ.setdefault("WORK_HUB_SECRETS_DIR", os.path.join(SANDBOX, "secrets"))
+
+from workhub import translate  # noqa: E402
+
+# Polish payloads reach the English renderer in tests too; echoing keeps `claude -p` out.
+translate.ask = lambda texts: list(texts)

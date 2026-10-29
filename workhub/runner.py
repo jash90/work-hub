@@ -72,7 +72,9 @@ def run_command(command, timeout, env=None):
 class Runner:
     """Shared by the HTTP server and the scheduler, so a click and a tick cannot collide."""
 
-    def __init__(self):
+    def __init__(self, after_success=None):
+        """`after_success(panel_id)` runs while the panel still counts as running."""
+        self._after_success = after_success
         self._locks = {p.id: threading.Lock() for p in sources.PANELS}
         self._running = set()
         self._queued = set()
@@ -123,8 +125,12 @@ class Runner:
                 payload["_notes"] = notes
 
             elapsed = int((time.time() - started) * 1000)
+            envelope = store.record_success(panel_id, payload, elapsed)
 
-            return store.record_success(panel_id, payload, elapsed)
+            if self._after_success:
+                self._after_success(panel_id)
+
+            return envelope
         except CommandFailed as exc:
             elapsed = int((time.time() - started) * 1000)
 

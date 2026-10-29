@@ -2,7 +2,8 @@
 
 RENDERERS is the whole dispatch table — one entry per panel in sources.PANELS.
 """
-from .. import links, sources, store
+from .. import links, sources, store, translate
+from ..text import ENGLISH, t, use
 from . import gitlab, layout, releases, reports, settings, tempo, work
 
 RENDERERS = {
@@ -28,14 +29,14 @@ def _safe(fn, payload, index=None):
     try:
         return fn(payload, index) if index is not None else fn(payload)
     except Exception as exc:
-        return '<div class="banner bad">Could not render the panel: %s</div>' % layout.esc(exc)
+        return '<div class="banner bad">%s</div>' % layout.esc(t("Could not render the panel: %s") % exc)
 
 
 def headline(panel_id, envelope):
     payload = (envelope or {}).get("payload")
 
     if payload is None:
-        return '<span class="muted">no data</span>'
+        return '<span class="muted">%s</span>' % layout.esc(t("no data"))
 
     return _safe(RENDERERS[panel_id][1], payload)
 
@@ -44,7 +45,7 @@ def body(panel_id, envelope):
     payload = (envelope or {}).get("payload")
 
     if payload is None:
-        return layout.empty("This panel has no data yet — click “Refresh”.")
+        return layout.empty(t("This panel has no data yet — click “Refresh”."))
 
     index = links.build() if panel_id in NEEDS_MR_INDEX else None
 
@@ -68,11 +69,11 @@ def _card(panel):
   <footer>
     %s
     <span class="spacer"></span>
-    <button data-refresh="%s">Refresh</button>
+    <button data-refresh="%s">%s</button>
   </footer>
-</article>""" % (panel.id, layout.state_of(envelope), panel.id, layout.esc(panel.label),
-                 layout.esc(panel.blurb), headline(panel.id, envelope),
-                 layout.freshness(envelope), panel.id)
+</article>""" % (panel.id, layout.state_of(envelope), panel.id, layout.esc(t(panel.label)),
+                 layout.esc(t(panel.blurb)), headline(panel.id, envelope),
+                 layout.freshness(envelope), panel.id, layout.esc(t("Refresh")))
 
 
 def overview(hub):
@@ -81,22 +82,26 @@ def overview(hub):
     for group, panels in sources.grouped_panels():
         cards = "".join(_card(p) for p in panels)
         groups.append('<section class="block"><h3>%s</h3><div class="grid">%s</div></section>'
-                      % (layout.esc(sources.GROUP_LABELS[group]), cards))
+                      % (layout.esc(t(sources.GROUP_LABELS[group])), cards))
 
-    schedule = " · ".join("%s: %s" % (s["label"], s["last_run"] or "not yet")
+    schedule = " · ".join("%s: %s" % (t(s["label"]), s["last_run"] or t("not yet"))
                           for s in hub.scheduler.describe())
-    head = ('<div class="page-head"><h1>Overview</h1>'
-            '<p>The last automatic runs — %s</p></div>') % layout.esc(schedule)
+    head = ('<div class="page-head"><h1>%s</h1><p>%s</p></div>'
+            % (layout.esc(t("Overview")), layout.esc(t("The last automatic runs — %s") % schedule)))
+
+    translate.flush_in_background()
 
     return layout.page("work-hub", "", head + "".join(groups), hub.csrf)
 
 
 def settings_page(hub):
     """Not a panel: it has no skill, no envelope and nothing for the scheduler to refresh."""
-    head = ('<div class="page-head"><h1>Settings</h1>'
-            '<p>The tokens and addresses used by the skills the hub runs.</p></div>')
+    head = ('<div class="page-head"><h1>%s</h1><p>%s</p></div>'
+            % (layout.esc(t("Settings")),
+               layout.esc(t("The tokens and addresses used by the skills the hub runs."))))
 
-    return layout.page("Settings — work-hub", "settings", head + settings.page_body(), hub.csrf)
+    return layout.page("%s — work-hub" % t("Settings"), "settings",
+                       head + settings.page_body(), hub.csrf)
 
 
 def panel_page(hub, panel_id):
@@ -109,11 +114,27 @@ def panel_page(hub, panel_id):
     %s
     <span class="spacer"></span>
     %s
-    <button data-refresh="%s">Refresh</button>
+    <button data-refresh="%s">%s</button>
   </header>
   <div data-fragment>%s</div>
-</section>""" % (panel_id, layout.state_of(envelope), layout.esc(panel.label),
+</section>""" % (panel_id, layout.state_of(envelope), layout.esc(t(panel.label)),
                  headline(panel_id, envelope), layout.freshness(envelope),
-                 panel_id, fragment(panel_id))
+                 panel_id, layout.esc(t("Refresh")), fragment(panel_id))
 
-    return layout.page("%s — work-hub" % panel.label, panel_id, head, hub.csrf)
+    translate.flush_in_background()
+
+    return layout.page("%s — work-hub" % t(panel.label), panel_id, head, hub.csrf)
+
+
+def translate_panel(panel_id):
+    """Render a panel in English only to meet its Polish strings, then translate them.
+
+    Run after a refresh, before the panel is reported finished, so the first page load after
+    it is already English. Rendering is the one place that knows which strings reach the
+    screen, so the queue is filled by the same code that will later read it.
+    """
+    use(ENGLISH)
+    envelope = store.read(panel_id)
+    headline(panel_id, envelope)
+    body(panel_id, envelope)
+    translate.flush()

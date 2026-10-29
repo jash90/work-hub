@@ -1,23 +1,30 @@
 """The page shell and the small vocabulary of bits every panel reuses."""
 import datetime
 import html
+import json
 import re
 import time
 
-from .. import config, overtime, sources
-from ..text import count, days
+from .. import config, overtime, sources, translate
+from ..catalog import NOUNS, POLISH
+from ..text import LANGUAGES, ago_phrase, count, days, is_polish, lang, t
+from ..text import month_name as named_month
+
+
+def shown(value):
+    """Skill data in the page language: in Polish the skills' own text is already right."""
+    text = "" if value is None else str(value)
+
+    return text if is_polish() else translate.english(text)
 
 
 def esc(value):
-    return html.escape("" if value is None else str(value), quote=True)
+    """Everything written into the page passes here, so this is where skill data turns English."""
+    return html.escape(shown(value), quote=True)
 
 
 def chip(text, tone=""):
     return '<span class="chip %s">%s</span>' % (tone, esc(text))
-
-
-MONTHS = ("January", "February", "March", "April", "May", "June", "July",
-          "August", "September", "October", "November", "December")
 
 
 def hours(value):
@@ -35,7 +42,7 @@ def month_name(month):
     The year is said once, above the list, rather than on every row of a narrow rail.
     """
     try:
-        return MONTHS[int(month[5:7]) - 1]
+        return named_month(int(month[5:7]))
     except (ValueError, IndexError):
         return month
 
@@ -43,24 +50,24 @@ def month_name(month):
 def ago(seconds):
     """Relative age at the coarsest unit that still says something useful."""
     if seconds is None:
-        return "never"
+        return t("never")
 
     delta = max(0, int(time.time() - seconds))
 
     if delta < 90:
-        return "just now"
+        return t("just now")
 
     minutes = delta // 60
 
     if minutes < 60:
-        return "%s ago" % count(minutes, "minute")
+        return ago_phrase(minutes, "minute")
 
     hours = minutes // 60
 
     if hours < 24:
-        return "%s ago" % count(hours, "hour")
+        return ago_phrase(hours, "hour")
 
-    return "%s ago" % days(hours // 24)
+    return ago_phrase(hours // 24, "day")
 
 
 def clock(seconds):
@@ -79,7 +86,7 @@ def clock(seconds):
 def freshness(envelope):
     """One line telling the truth about the data on screen."""
     if not envelope or envelope.get("payload") is None:
-        return '<time class="stamp">no data</time>'
+        return '<time class="stamp">%s</time>' % esc(t("no data"))
 
     return '<time class="stamp" title="%s">%s (%s)</time>' % (
         esc(clock(envelope.get("fetched_at"))), esc(clock(envelope.get("fetched_at"))),
@@ -89,7 +96,7 @@ def freshness(envelope):
 def banner(envelope):
     """A failed refresh must say so, without hiding the older data it left standing."""
     if not envelope:
-        return '<div class="banner info">This panel has not been refreshed yet.</div>'
+        return '<div class="banner info">%s</div>' % esc(t("This panel has not been refreshed yet."))
 
     error = envelope.get("error")
 
@@ -97,12 +104,13 @@ def banner(envelope):
         return ""
 
     if envelope.get("payload") is None:
-        return ('<div class="banner bad"><strong>Could not fetch the data.</strong> %s</div>'
-                % esc(tidy_error(error)))
+        return ('<div class="banner bad"><strong>%s</strong> %s</div>'
+                % (esc(t("Could not fetch the data.")), esc(tidy_error(error))))
 
-    return ('<div class="banner warn"><strong>Data from %s</strong> — the last attempt (%s) failed: %s</div>'
-            % (esc(clock(envelope.get("fetched_at"))), esc(clock(envelope.get("attempted_at"))),
-               esc(tidy_error(error))))
+    return ('<div class="banner warn"><strong>%s</strong> — %s</div>'
+            % (esc(t("Data from %s") % clock(envelope.get("fetched_at"))),
+               esc(t("the last attempt (%s) failed: %s")
+                   % (clock(envelope.get("attempted_at")), tidy_error(error)))))
 
 
 TAGS = re.compile(r"<[^>]+>")
@@ -171,7 +179,7 @@ def rail_figure():
       </button>
       <ul class="rail-months" data-overtime-months>%s</ul>
     </div>""" % ("" if figure["months"] else " hidden",
-                 esc(("Overtime %s" % figure["year"]).strip()),
+                 esc((t("Overtime %s") % figure["year"]).strip()),
                  esc(signed_hours(figure["total"])), rows)
 
 
@@ -186,24 +194,25 @@ def sidebar(active):
     for group, panels in sources.grouped_panels():
         links = "".join(
             '<a href="/p/%s" class="%s">%s</a>'
-            % (panel.id, "on" if active == panel.id else "", esc(panel.label))
+            % (panel.id, "on" if active == panel.id else "", esc(t(panel.label)))
             for panel in panels)
         sections.append('<div class="nav-group"><h4>%s</h4>%s</div>'
-                        % (esc(sources.GROUP_LABELS[group]), links))
+                        % (esc(t(sources.GROUP_LABELS[group])), links))
 
     return """<div class="scrim" data-nav-close hidden></div>
-<aside class="sidebar" id="sidebar" aria-label="Navigation">
+<aside class="sidebar" id="sidebar" aria-label="%s">
   <div class="sidebar-head">
     <a class="brand" href="/"><span class="dot"></span>work-hub</a>
   </div>
   <nav class="sidebar-nav">
-    <a href="/" class="%s">Overview</a>
+    <a href="/" class="%s">%s</a>
     %s
-    <div class="nav-group nav-foot"><a href="/settings" class="%s">Settings</a></div>
+    <div class="nav-group nav-foot"><a href="/settings" class="%s">%s</a></div>
     %s
   </nav>
-</aside>""" % ("on" if active == "" else "", "".join(sections),
-               "on" if active == "settings" else "", rail_figure())
+</aside>""" % (esc(t("Navigation")), "on" if active == "" else "", esc(t("Overview")),
+               "".join(sections), "on" if active == "settings" else "", esc(t("Settings")),
+               rail_figure())
 
 
 # Applied before first paint so a dark theme never flashes white on load.
@@ -217,17 +226,40 @@ CRUMBS = {"": "Overview", "settings": "Settings"}
 def crumb(active):
     panel = sources.BY_ID.get(active)
 
-    return panel.label if panel else CRUMBS.get(active, "Overview")
+    return t(panel.label if panel else CRUMBS.get(active, "Overview"))
+
+
+def strings_for_browser():
+    """The Polish catalogue for app.js, embedded only when the page is Polish.
+
+    One source for both sides of the wire: the browser reads the same table `t()` does.
+    """
+    if not is_polish():
+        return ""
+
+    blob = json.dumps({"strings": POLISH, "nouns": NOUNS}, ensure_ascii=False)
+
+    return "<script>window.WORK_HUB_STRINGS = %s;</script>" % blob.replace("</", "<\\/")
+
+
+def language_toggle():
+    """Names the language a click switches to, as language pickers conventionally do."""
+    other = [code for code in LANGUAGES if code != lang()][0]
+
+    return ('<button class="ghost icon" data-lang="%s" title="%s" aria-label="%s">%s</button>'
+            % (other, html.escape(t("Switch to English") if is_polish() else "Przełącz na polski"),
+               esc(t("Change language")), other.upper()))
 
 
 def page(title, active, body, csrf):
     return """<!doctype html>
-<html lang="en" data-csrf="%s" data-jira="%s" data-keys="%s">
+<html lang="%s" data-csrf="%s" data-jira="%s" data-keys="%s">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%s</title>
 <link rel="stylesheet" href="/static/app.css">
+%s
 %s
 </head>
 <body>
@@ -235,12 +267,13 @@ def page(title, active, body, csrf):
 <div class="content">
   <header class="topbar">
     <div class="topbar-inner">
-      <button class="ghost icon nav-toggle" data-nav-open aria-label="Open navigation"
+      <button class="ghost icon nav-toggle" data-nav-open aria-label="%s"
               aria-controls="sidebar" aria-expanded="false">☰</button>
       <h2 class="crumb">%s</h2>
       <span class="spacer"></span>
-      <button class="ghost icon" data-theme-toggle title="Theme: automatic" aria-label="Change theme">◐</button>
-      <button class="primary" data-refresh-all>Refresh all</button>
+      %s
+      <button class="ghost icon" data-theme-toggle title="%s" aria-label="%s">◐</button>
+      <button class="primary" data-refresh-all>%s</button>
     </div>
   </header>
   <div class="page">
@@ -248,11 +281,14 @@ def page(title, active, body, csrf):
   </div>
 </div>
 <div class="toast-stack" role="status" aria-live="polite"></div>
+<script src="/static/i18n.js"></script>
 <script src="/static/day-rules.js"></script>
 <script src="/static/app.js"></script>
 </body>
-</html>""" % (esc(csrf), esc(config.jira_base_url()), esc(",".join(config.project_keys())),
-                 esc(title), THEME_BOOT, sidebar(active), esc(crumb(active)), body)
+</html>""" % (lang(), esc(csrf), esc(config.jira_base_url()), esc(",".join(config.project_keys())),
+                 esc(title), THEME_BOOT, strings_for_browser(), sidebar(active),
+                 esc(t("Open navigation")), esc(crumb(active)), language_toggle(),
+                 esc(t("Theme: automatic")), esc(t("Change theme")), esc(t("Refresh all")), body)
 
 
 BUCKET_LABELS = {0: "Overdue", 1: "Upcoming", 2: "No date", 3: "No version"}
@@ -288,11 +324,12 @@ def version_link(key, version_id, name):
 
 
 def table(headers, rows):
-    """`headers` are plain strings; `rows` hold ready HTML so cells can carry links."""
+    """`headers` are plain English strings, put into the page language here; `rows` hold
+    ready HTML so cells can carry links."""
     if not rows:
         return ""
 
-    head = "".join("<th>%s</th>" % esc(h) for h in headers)
+    head = "".join("<th>%s</th>" % esc(t(h)) for h in headers)
     body = "".join("<tr>%s</tr>" % "".join("<td>%s</td>" % c for c in row) for row in rows)
 
     # Wrapped so a wide table scrolls inside its card instead of widening the whole page.
@@ -312,13 +349,13 @@ def when(row):
 
     if left is not None:
         if left < 0:
-            parts.append('<span class="chip bad">%s overdue</span>' % days(abs(left)))
+            parts.append(chip(t("%s overdue") % days(abs(left)), "bad"))
         elif left == 0:
-            parts.append('<span class="chip wait">today</span>')
+            parts.append(chip(t("today"), "wait"))
         elif left == 1:
-            parts.append('<span class="chip wait">tomorrow</span>')
+            parts.append(chip(t("tomorrow"), "wait"))
         else:
-            parts.append('<span class="chip">in %s</span>' % days(left))
+            parts.append(chip(t("in %s") % days(left)))
 
     return " ".join(parts)
 
@@ -332,7 +369,7 @@ def mr_links(mrs):
         detail = []
 
         if mr.get("approvals") is not None:
-            detail.append("%d approve" % mr["approvals"])
+            detail.append(t("%d approve") % mr["approvals"])
             tone = "ok" if mr["approvals"] >= 2 else ""
 
         if mr.get("unresolved"):
@@ -350,7 +387,7 @@ def notes(payload):
     """Fallback notes recorded by the runner — partial data must announce itself."""
     recorded = (payload or {}).get("_notes") or {}
 
-    return "".join('<div class="banner warn">%s</div>' % esc(text) for text in recorded.values())
+    return "".join('<div class="banner warn">%s</div>' % esc(t(text)) for text in recorded.values())
 
 
 def copy_button(label, text):

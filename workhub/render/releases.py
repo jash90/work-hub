@@ -1,7 +1,7 @@
 """The release board: every fixVersion carrying one of my tasks."""
 from collections import defaultdict
 
-from ..text import count
+from ..text import count, t
 from .layout import chip, empty, esc, notes, section, table, ticket_link, version_link
 
 PROGRESS_TONES = {"review": "accent", "qa": "wait", "done": "ok", "mine": ""}
@@ -16,7 +16,7 @@ def _mr_marks(mrs):
 
     for mr in mrs or []:
         tone = "ok" if mr.get("approval_count", 0) >= 2 else ""
-        label = "!%s (%d approve" % (mr.get("iid"), mr.get("approval_count", 0))
+        label = "!%s (%s" % (mr.get("iid"), t("%d approve") % mr.get("approval_count", 0))
 
         if mr.get("unresolved"):
             label += ", %s" % count(mr["unresolved"], "unresolved thread")
@@ -50,9 +50,9 @@ def finished_reason(items):
     others_open = [i for i in items if not i.get("mine") and i.get("progress") != CLOSED]
 
     if not others_open:
-        return "every task closed"
+        return t("every task closed")
 
-    return "my tasks closed · %s still open for the team" % count(len(others_open), "task")
+    return t("my tasks closed · %s still open for the team") % count(len(others_open), "task")
 
 
 def _release(name, when, items, mrs):
@@ -75,17 +75,17 @@ def _release(name, when, items, mrs):
     return """<section class="block release" data-release="%s"%s%s>
   <h3>
     <button type="button" class="ghost release-fold" data-release-fold aria-expanded="true"
-            aria-label="fold this release">▾</button>
+            aria-label="%s">▾</button>
     <span class="release-name">%s</span><span class="muted">%s</span>
     %s%s%s
   </h3>
   <div class="release-body">%s</div>
 </section>""" % (
         esc(name), "" if mine else " data-none-mine",
-        ' data-finished="%s"' % esc(reason) if reason else "",
+        ' data-finished="%s"' % esc(reason) if reason else "", esc(t("fold this release")),
         version_link(known["key"], known.get("release_id"), name), esc(when),
         chip(count(len(items), "task"), "count-all"),
-        chip("%d of %d mine" % (mine, len(items)), "count-mine"),
+        chip(t("%d of %d mine") % (mine, len(items)), "count-mine"),
         ' <span class="muted finished-why">%s</span>' % esc(reason) if reason else "",
         table(["Ticket", "Status", "Assignee", "Summary", "MR"], rows),
     )
@@ -98,7 +98,8 @@ def body(payload):
     groups = defaultdict(list)
 
     for issue in issues:
-        groups[(issue.get("release_date") or "9999", issue.get("release_name") or "No version")].append(issue)
+        groups[(issue.get("release_date") or "9999",
+                issue.get("release_name") or t("No version"))].append(issue)
 
     blocks = [notes(payload), _warnings(data)]
     finished = sum(1 for items in groups.values() if finished_reason(items))
@@ -107,10 +108,11 @@ def body(payload):
         blocks.append("""<div class="release-bar" data-release-bar>
   <span class="muted" data-fold-count>%s</span>
   <span class="spacer"></span>
-  <label class="switch"><input type="checkbox" data-only-mine> Only my tasks</label>
-  <button type="button" class="ghost" data-fold-all="yes">Fold all</button>
-  <button type="button" class="ghost" data-fold-all="no">Unfold all</button>
-</div>""" % esc("%s folded as finished" % count(finished, "release") if finished else ""))
+  <label class="switch"><input type="checkbox" data-only-mine> %s</label>
+  <button type="button" class="ghost" data-fold-all="yes">%s</button>
+  <button type="button" class="ghost" data-fold-all="no">%s</button>
+</div>""" % (esc(t("%s folded as finished") % count(finished, "release") if finished else ""),
+             esc(t("Only my tasks")), esc(t("Fold all")), esc(t("Unfold all"))))
 
     for (date, name), items in sorted(groups.items()):
         blocks.append(_release(name, "" if date == "9999" else " · %s" % date, items, mrs))
@@ -122,10 +124,10 @@ def body(payload):
                  ticket_link(h["key"]),
                  '<span class="muted">%s → </span>%s' % (esc(h.get("from")), chip(h.get("to") or ""))]
                 for h in history[:25]]
-        blocks.append(section("Status changes", table(["When", "Ticket", "Transition"], rows),
+        blocks.append(section(t("Status changes"), table(["When", "Ticket", "Transition"], rows),
                               chip(str(len(history)))))
 
-    return "".join(blocks) or empty("No tasks in any release.")
+    return "".join(blocks) or empty(t("No tasks in any release."))
 
 
 def headline(payload):

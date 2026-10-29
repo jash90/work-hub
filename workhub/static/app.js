@@ -35,7 +35,7 @@ function applyTheme(theme) {
 
   for (const button of document.querySelectorAll('[data-theme-toggle]')) {
     button.textContent = THEME_GLYPH[theme];
-    button.title = THEME_TITLE[theme];
+    button.title = t(THEME_TITLE[theme]);
   }
 }
 
@@ -75,7 +75,7 @@ function busy(ids, on) {
     for (const button of document.querySelectorAll(`[data-refresh="${id}"]`)) {
       button.disabled = on;
       button.setAttribute('aria-busy', String(on));
-      button.textContent = on ? 'Refreshing' : 'Refresh';
+      button.textContent = on ? t('Refreshing') : t('Refresh');
     }
   }
 }
@@ -115,7 +115,7 @@ async function follow(ids) {
       busy([panel.id], false);
       await repaint(panel);
 
-      if (panel.error && panel.fetched_at) toast(`${panel.label}: showing older data, the refresh failed`, 'bad', 7000);
+      if (panel.error && panel.fetched_at) toast(t('{0}: showing older data, the refresh failed', panel.label), 'bad', 7000);
       else if (panel.error) toast(`${panel.label}: ${panel.error.slice(0, 160)}`, 'bad', 8000);
 
       if (document.querySelector('.grid')) refreshedCards = true;
@@ -132,6 +132,15 @@ async function follow(ids) {
 document.addEventListener('click', async (event) => {
   if (event.target.closest('[data-nav-open]')) return setNav(true);
   if (event.target.closest('[data-nav-close]')) return setNav(false);
+
+  const language = event.target.closest('[data-lang]');
+
+  if (language) {
+    document.cookie = `work-hub-lang=${language.dataset.lang}; path=/; max-age=31536000; SameSite=Lax`;
+    window.location.reload();
+
+    return;
+  }
 
   const theme = event.target.closest('[data-theme-toggle]');
 
@@ -150,7 +159,7 @@ document.addEventListener('click', async (event) => {
 
   // The CSRF token is minted at start-up, so a tab opened before a hub restart holds a dead one.
   if (status === 403) {
-    toast('The hub restarted since this page loaded — reloading…', 'bad');
+    toast(t('The hub restarted since this page loaded — reloading…'), 'bad');
     setTimeout(() => window.location.reload(), 1200);
 
     return;
@@ -160,7 +169,7 @@ document.addEventListener('click', async (event) => {
 
   busy(ids, true);
   if (all) event.target.closest('[data-refresh-all]').setAttribute('aria-busy', 'true');
-  toast(all ? 'Refreshing every panel…' : 'Refreshing…');
+  toast(all ? t('Refreshing every panel…') : t('Refreshing…'));
   await follow(ids);
 });
 
@@ -174,7 +183,7 @@ function bindCopy(root) {
       );
 
       const ok = await toClipboard(text);
-      toast(ok ? 'Copied to the clipboard' : 'The browser refused access to the clipboard',
+      toast(ok ? t('Copied to the clipboard') : t('The browser refused access to the clipboard'),
             ok ? 'ok' : 'bad');
     };
   }
@@ -218,7 +227,7 @@ function refreshDay(day) {
   day.dataset.valid = verdict.ok ? 'yes' : 'no';
   const submit = day.querySelector('[data-tempo-log]');
   submit.disabled = !verdict.ok;
-  submit.title = verdict.problem || 'Writes the worklogs to Tempo';
+  submit.title = verdict.problem || t('Writes the worklogs to Tempo');
 
   return { entries: all.filter((e) => e.hours > 0), total: verdict.total, partial, overtime };
 }
@@ -247,16 +256,16 @@ function addEntryRow(day, key, hours) {
   row.dataset.entry = '';
   row.innerHTML = `
     <td class="entry-key">${ticketLink(key)}</td>
-    <td class="entry-summary"><span class="muted">added by hand</span></td>
+    <td class="entry-summary"><span class="muted">${t('added by hand')}</span></td>
     <td class="entry-commits"></td>
     <td class="entry-hours">
       <div class="stepper">
-        <button type="button" class="step" data-step="-0.25" aria-label="15 minutes less">−</button>
+        <button type="button" class="step" data-step="-0.25" aria-label="${t('15 minutes less')}">−</button>
         <input type="text" class="hours" value="${fmt(hours)}" inputmode="decimal" autocomplete="off">
-        <button type="button" class="step" data-step="0.25" aria-label="15 minutes more">+</button>
+        <button type="button" class="step" data-step="0.25" aria-label="${t('15 minutes more')}">+</button>
       </div>
     </td>
-    <td class="entry-drop"><button type="button" class="ghost" data-drop aria-label="remove entry">×</button></td>`;
+    <td class="entry-drop"><button type="button" class="ghost" data-drop aria-label="${t('remove entry')}">×</button></td>`;
   body.appendChild(row);
 }
 
@@ -322,7 +331,7 @@ function bindTempo(root) {
 
         if (!/^[A-Z][A-Z0-9]*-\d+$/.test(key)) {
           keyField.setAttribute('aria-invalid', 'true');
-          toast(`A ticket key looks like ${KEY_HINT}-1234`, 'bad');
+          toast(t('A ticket key looks like {0}-1234', KEY_HINT), 'bad');
 
           return;
         }
@@ -360,7 +369,7 @@ async function write(day, button, body, done) {
 
   if (data.ok) markStale(day, done);
 
-  toast(data.ok ? done : `Refused: ${(data.output || data.error || '').slice(0, 200)}`,
+  toast(data.ok ? done : t('Refused: {0}', (data.output || data.error || '').slice(0, 200)),
         data.ok ? 'ok' : 'bad', data.ok ? 4000 : 9000);
 }
 
@@ -373,15 +382,16 @@ async function submitDay(day, button) {
   const listing = entries.map((e) => `  ${e.key} — ${fmt(e.hours)} h`).join('\n');
   let label = '';
 
-  if (total < target) label = ' (short day)';
-  else if (total > target) label = ' (overtime)';
+  if (total < target) label = ` (${t('short day')})`;
+  else if (total > target) label = ` (${t('overtime')})`;
 
-  if (!confirm(`Write worklogs to Tempo for ${day.dataset.day}${label}?\n\n${listing}\n\n${fmt(total)} h in total. This is a real POST to Jira.`)) return;
+  if (!confirm(t('Write worklogs to Tempo for {0}{1}?\n\n{2}\n\n{3} h in total. This is a real POST to Jira.',
+                 day.dataset.day, label, listing, fmt(total)))) return;
 
   await write(day, button, {
     endpoint: day.dataset.endpoint,
     payload: { entries: entriesString(entries), allow_partial: partial, allow_overtime: overtime },
-  }, `Saved ${day.dataset.day} — ${fmt(total)} h`);
+  }, t('Saved {0} — {1} h', day.dataset.day, fmt(total)));
 }
 
 // Clearing goes through the same declarative route as an edit: an empty split is a day with
@@ -389,18 +399,18 @@ async function submitDay(day, button) {
 async function clearDay(day, button) {
   if (day.dataset.stale) return;
 
-  if (!confirm(`Clear ${day.dataset.day} in Tempo? This deletes every worklog on that day.`)) return;
+  if (!confirm(t('Clear {0} in Tempo? This deletes every worklog on that day.', day.dataset.day))) return;
 
   await write(day, button, { endpoint: '/api/tempo/replace', payload: { entries: '' } },
-              `Cleared ${day.dataset.day}`);
+              t('Cleared {0}', day.dataset.day));
 }
 
 async function undoDay(day, button) {
   if (day.dataset.stale) return;
 
-  if (!confirm(`Undo the worklogs for ${day.dataset.day}? They will be deleted from Jira.`)) return;
+  if (!confirm(t('Undo the worklogs for {0}? They will be deleted from Jira.', day.dataset.day))) return;
 
-  await write(day, button, { endpoint: '/api/tempo/undo', payload: {} }, `Undone ${day.dataset.day}`);
+  await write(day, button, { endpoint: '/api/tempo/undo', payload: {} }, t('Undone {0}', day.dataset.day));
 }
 
 function bindWeeks(root) {
@@ -559,7 +569,7 @@ function bindPicker(root) {
     const scope = picker.closest('section') || root;
     const boxes = () => [...scope.querySelectorAll('.pick')];
     const picked = () => boxes().filter((box) => box.checked);
-    const count = picker.querySelector('[data-pick-count]');
+    const counter = picker.querySelector('[data-pick-count]');
     const copy = picker.querySelector('[data-pick-copy]');
     const masters = [...picker.querySelectorAll('[data-pick-all]')];
 
@@ -569,9 +579,9 @@ function bindPicker(root) {
 
     const update = () => {
       const chosen = picked();
-      count.textContent = chosen.length
-        ? `${chosen.length} of ${count(boxes().length, 'MR')}`
-        : 'nothing selected';
+      counter.textContent = chosen.length
+        ? t('{0} of {1}', chosen.length, count(boxes().length, 'MR'))
+        : t('nothing selected');
       copy.disabled = !chosen.length;
 
       for (const master of masters) {
@@ -597,8 +607,8 @@ function bindPicker(root) {
     copy.onclick = async () => {
       const links = picked().map((box) => box.dataset.url);
       const ok = await toClipboard(links.join('\n'));
-      toast(ok ? `Copied ${count(links.length, 'link')}`
-               : 'The browser refused access to the clipboard', ok ? 'ok' : 'bad');
+      toast(ok ? t('Copied {0}', count(links.length, 'link'))
+               : t('The browser refused access to the clipboard'), ok ? 'ok' : 'bad');
     };
 
     update();
@@ -642,12 +652,12 @@ function bindSettings(root) {
     save.disabled = false;
 
     if (!data.ok) {
-      toast(`Not saved: ${(data.error || '').slice(0, 200)}`, 'bad', 9000);
+      toast(t('Not saved: {0}', (data.error || '').slice(0, 200)), 'bad', 9000);
 
       return;
     }
 
-    toast(`Saved ${count(data.saved.length, 'setting')}`, 'ok');
+    toast(t('Saved {0}', count(data.saved.length, 'setting')), 'ok');
     // Re-render so every field reports its stored state instead of what was typed into it.
     setTimeout(() => window.location.reload(), 600);
   });
@@ -719,7 +729,7 @@ function paintOvertime(data) {
   if (!figure || !data) return;
 
   figure.hidden = !data.months.length;
-  figure.querySelector('[data-overtime-label]').textContent = `Overtime ${data.year}`.trim();
+  figure.querySelector('[data-overtime-label]').textContent = t('Overtime {0}', data.year).trim();
   figure.querySelector('[data-overtime-total]').textContent = signedHours(data.total);
   figure.querySelector('[data-overtime-months]').innerHTML = data.months
     .map((month) => `<li><span>${month.label}</span><span class="num">${signedHours(month.hours)}</span></li>`)

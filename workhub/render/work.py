@@ -1,6 +1,6 @@
 """Panels answering "what have I got to do": dashboard, priority, testing."""
 from ..links import merge
-from ..text import count, days_ago
+from ..text import count, days_ago, t
 from .layout import (BUCKET_LABELS, BUCKET_TONES, chip, empty, esc, link, mr_links, section,
                      table, ticket_link, when)
 
@@ -37,11 +37,11 @@ def _mr_rows(mrs, min_approvals):
 
     for mr in mrs:
         flags = list(mr.get("blocking") or [])
-        marks = [chip("%d/%d approve" % (mr.get("approval_count", 0), min_approvals),
+        marks = [chip(t("%d/%d approve") % (mr.get("approval_count", 0), min_approvals),
                       "ok" if mr.get("approval_count", 0) >= min_approvals else "")]
 
         if mr.get("draft"):
-            marks.append(chip("draft", "wait"))
+            marks.append(chip(t("draft"), "wait"))
 
         if mr.get("unresolved"):
             marks.append(chip(count(mr["unresolved"], "thread"), "wait"))
@@ -80,22 +80,22 @@ def dashboard_body(payload, index=None):
 
     tasks = data.get("tasks") or []
     blocks.append(section(
-        "To do", table(["Ticket", "Status", "Release", "Summary", "MR"], _task_rows(tasks, index))
-        or empty("Nothing waiting to be started."),
+        t("To do"), table(["Ticket", "Status", "Release", "Summary", "MR"], _task_rows(tasks, index))
+        or empty(t("Nothing waiting to be started.")),
         chip(str(len(tasks)))))
 
     ready = data.get("ready") or []
     blocks.append(section(
-        "Ready to merge",
+        t("Ready to merge"),
         table(["MR", "Repo", "Title", "State", "Blockers"], _mr_rows(ready, data.get("min_approvals", 2)))
-        or empty("None of my MRs has a full set of approvals yet."),
+        or empty(t("None of my MRs has a full set of approvals yet.")),
         chip(str(len(ready)), "ok" if ready else "")))
 
     others = data.get("other_mrs") or []
     blocks.append(section(
-        "My other MRs",
+        t("My other MRs"),
         table(["MR", "Repo", "Title", "State", "Blockers"], _mr_rows(others, data.get("min_approvals", 2)))
-        or empty("No other open MRs."),
+        or empty(t("No other open MRs.")),
         chip(str(len(others)))))
 
     review = data.get("review") or {}
@@ -104,29 +104,31 @@ def dashboard_body(payload, index=None):
 
     if summary:
         counts = summary.get("counts") or {}
-        marks = " ".join(chip("%s: %d" % (REVIEW_LABELS.get(k, k), v),
+        marks = " ".join(chip("%s: %d" % (t(REVIEW_LABELS.get(k, k)), v),
                               "wait" if k == "waiting_for_me" else "")
                          for k, v in sorted(counts.items(), key=lambda kv: -kv[1]))
         mine = [t for t in threads if t.get("kind") == "waiting_for_me"]
         stuck = [t for t in threads if t.get("kind") in ("ignored", "no_reply")]
 
         body = ['<p class="headline">%s</p>' % marks]
-        body.append(section("Waiting on me", table(
-            ["MR", "Repo", "Where", "Comment", "Waiting"], _review_rows(mine)) or empty("Nothing."), ""))
-        body.append(section("Waiting on the author", table(
-            ["MR", "Repo", "Where", "Comment", "Waiting"], _review_rows(stuck[:20])) or empty("Nothing."), ""))
+        headers = ["MR", "Repo", "Where", "Comment", "Waiting"]
+        body.append(section(t("Waiting on me"), table(headers, _review_rows(mine))
+                            or empty(t("Nothing.")), ""))
+        body.append(section(t("Waiting on the author"), table(headers, _review_rows(stuck[:20]))
+                            or empty(t("Nothing.")), ""))
 
         blocks.append(section(
-            "My comments on other people's MRs", "".join(body),
-            chip("%d across %s" % (summary.get("total", 0), count(summary.get("mrs", 0), "MR")))))
+            t("My comments on other people's MRs"), "".join(body),
+            chip(t("%d across %s") % (summary.get("total", 0), count(summary.get("mrs", 0), "MR")))))
 
     drift = data.get("drift") or []
 
     if drift:
         rows = [[link(d.get("url"), d.get("label"), mono=True), chip(d.get("status") or "—"),
                  '<span class="summary">%s</span>' % esc(d.get("detail"))] for d in drift]
-        blocks.append(section("Jira ↔ GitLab drift",
-                              table(["Ticket", "Status", "What to do"], rows), chip(str(len(drift)), "wait")))
+        blocks.append(section(t("Jira ↔ GitLab drift"),
+                              table(["Ticket", "Status", "What to do"], rows),
+                              chip(str(len(drift)), "wait")))
 
     return "".join(blocks)
 
@@ -136,10 +138,10 @@ def dashboard_headline(payload):
     review = (data.get("review") or {}).get("summary") or {}
 
     return " ".join([
-        chip("%s to do" % count(len(data.get("tasks") or []), "task")),
-        chip("%s ready to merge" % count(len(data.get("ready") or []), "MR"),
+        chip(t("%s to do") % count(len(data.get("tasks") or []), "task")),
+        chip(t("%s ready to merge") % count(len(data.get("ready") or []), "MR"),
              "ok" if data.get("ready") else ""),
-        chip("%s on me" % count(review.get("on_me", 0), "comment"),
+        chip(t("%s on me") % count(review.get("on_me", 0), "comment"),
              "wait" if review.get("on_me") else ""),
     ])
 
@@ -152,11 +154,11 @@ def priority_body(payload, index=None):
     for bucket in sorted({i.get("bucket", 3) for i in issues}):
         rows = [i for i in issues if i.get("bucket", 3) == bucket]
         blocks.append(section(
-            BUCKET_LABELS.get(bucket, "Other"),
+            t(BUCKET_LABELS.get(bucket, "Other")),
             table(["Ticket", "Status", "Release", "Summary", "MR"], _task_rows(rows, index)),
             chip(str(len(rows)), BUCKET_TONES.get(bucket, ""))))
 
-    return "".join(blocks) or empty("No unresolved tasks.")
+    return "".join(blocks) or empty(t("No unresolved tasks."))
 
 
 def priority_headline(payload):
@@ -164,7 +166,7 @@ def priority_headline(payload):
     overdue = len([i for i in issues if i.get("bucket") == 0])
 
     return " ".join([chip(count(len(issues), "task")),
-                     chip("%d overdue" % overdue, "bad" if overdue else "")])
+                     chip(t("%d overdue") % overdue, "bad" if overdue else "")])
 
 
 def _queried_status(payload):
@@ -192,10 +194,10 @@ def testing_body(payload, index=None):
     headers = ["Ticket", "Status", "Assignee", "Summary", "MR"]
 
     return "".join([
-        section("Still in “%s”" % status, table(headers, rows(still))
-                or empty("Nothing waiting."), chip(str(len(still)), "wait" if still else "")),
-        section("Moved on", table(headers, rows(moved[:40]))
-                or empty("Nothing."), chip(str(len(moved)), "ok")),
+        section(t("Still in “%s”") % status, table(headers, rows(still))
+                or empty(t("Nothing waiting.")), chip(str(len(still)), "wait" if still else "")),
+        section(t("Moved on"), table(headers, rows(moved[:40]))
+                or empty(t("Nothing.")), chip(str(len(moved)), "ok")),
     ])
 
 
@@ -205,5 +207,5 @@ def testing_headline(payload):
     issues = data.get("issues") or []
     still = len([i for i in issues if i.get("status") == status])
 
-    return " ".join([chip("%s in testing" % count(len(issues), "ticket")),
-                     chip("%d still there" % still, "wait" if still else "ok")])
+    return " ".join([chip(t("%s in testing") % count(len(issues), "ticket")),
+                     chip(t("%d still there") % still, "wait" if still else "ok")])

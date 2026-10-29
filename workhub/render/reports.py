@@ -4,9 +4,7 @@
 `claude -p` and caches it per row. `protokol` still hands its legal rewrite to Claude Code
 through a copyable brief — the hub never invents prose it has not got.
 """
-import datetime
-
-from ..text import count
+from ..text import count, short_date, t
 from .layout import chip, copy_button, empty, esc, mr_links, section, table, ticket_link
 
 # The report itself is a Polish legal document, so the phrasing it asks for stays Polish —
@@ -44,7 +42,7 @@ def _commit_row(row):
     mr = row.get("mr")
     tickets = "<br>".join(ticket_link(key) for key in row["tickets"])
     subjects = "\n".join(c["subject"] for c in row["commits"])
-    status = chip(COMMIT_STATES.get(row["state"], row["state"]), TONE_CHIPS.get(row["tone"], ""))
+    status = chip(t(COMMIT_STATES.get(row["state"], row["state"])), TONE_CHIPS.get(row["tone"], ""))
     where = (mr_links([{"iid": mr["iid"], "url": mr["web_url"], "title": mr.get("title")}])
              if mr else '<span class="muted key">%s</span>' % esc(row.get("ref")))
 
@@ -65,23 +63,22 @@ def commits_body(payload):
     data = payload.get("main")
 
     if not data:
-        return empty("This panel's data predates the current report format — click “Refresh”.")
+        return empty(t("This panel's data predates the current report format — click “Refresh”."))
 
     blocks = []
 
     for repo_day in data["sections"]:
-        day = datetime.date.fromisoformat(repo_day["day"]).strftime("%a %d.%m")
         blocks.append(section(
-            "%s · %s" % (day, repo_day["repo"]),
+            "%s · %s" % (short_date(repo_day["day"]), repo_day["repo"]),
             table(["Ticket", "What changed", "Status"], [_commit_row(r) for r in repo_day["rows"]]),
             '<span class="muted">%s</span>' % esc(count(repo_day["commits"], "commit"))))
 
-    return "".join(blocks) or empty("No commits in the last 30 days.")
+    return "".join(blocks) or empty(t("No commits in the last 30 days."))
 
 
 def commits_headline(payload):
     if not payload.get("main"):
-        return '<span class="muted">refresh needed</span>'
+        return '<span class="muted">%s</span>' % esc(t("refresh needed"))
 
     rows = _commit_rows(payload)
     tickets = sum(len(r["tickets"]) for r in rows)
@@ -91,8 +88,8 @@ def commits_headline(payload):
 
     return " ".join([chip(count(commits, "commit")),
                      chip(count(tickets, "ticket")),
-                     chip("%d on develop" % merged, "ok" if merged else ""),
-                     chip("%d waiting" % waiting, "wait" if waiting else "")])
+                     chip(t("%d on develop") % merged, "ok" if merged else ""),
+                     chip(t("%d waiting") % waiting, "wait" if waiting else "")])
 
 
 def protokol_body(payload):
@@ -113,9 +110,9 @@ def protokol_body(payload):
                    for i in items]
 
     return section(
-        "Items for %s" % (data.get("month") or ""),
-        table(["Ticket", "Product", "Platforms", "Summary"], rows) or empty("No items."),
-        copy_button("Copy the brief for Claude",
+        t("Items for %s") % (data.get("month") or ""),
+        table(["Ticket", "Product", "Platforms", "Summary"], rows) or empty(t("No items.")),
+        copy_button(t("Copy the brief for Claude"),
                     PROTOKOL_BRIEF % (data.get("month") or "", "\n".join(brief_lines))))
 
 
